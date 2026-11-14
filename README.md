@@ -1,4 +1,4 @@
-# Promolux CRM 0.3.1
+# Promolux CRM 0.3.2
 
 CRM для полиграфии: клиенты, сделки и Kanban, заказы, касса и учёт вознаграждений SFP. Laravel 13, Filament 5, Livewire 4, PHP 8.5. Валюта UZS, время Asia/Tashkent.
 

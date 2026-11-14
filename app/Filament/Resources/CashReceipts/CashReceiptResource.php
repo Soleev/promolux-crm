@@ -5,7 +5,7 @@ namespace App\Filament\Resources\CashReceipts;
 use App\Filament\CrmForms;
 use App\Filament\CrmTableUi;
 use App\Models\CashReceipt;
-use App\Models\Order;
+use App\Filament\OrderSelect;
 use App\Models\User;
 use App\Services\CashDesk;
 use App\Services\Ledger;
@@ -74,7 +74,7 @@ class CashReceiptResource extends Resource
         return Action::make('collect')->label('Записать наличные от клиента')->visible(fn () => in_array(auth()->user()->role, ['owner', 'rop', 'manager', 'designer'], true))
             ->schema([
                 Hidden::make('idempotency_key')->default(fn () => (string) Str::uuid()),
-                CrmForms::relation('order_id', Order::class, 'Заказ', 'number', true),
+                OrderSelect::make(true),
                 CrmForms::money(),
                 DatePicker::make('collected_at')->native(false)->displayFormat('d.m.Y')->label('Дата получения от клиента')->default(today())->maxDate(today())->required(),
                 Select::make('collector_id')->label('Кто принял у клиента')->visible(fn () => auth()->user()->role === 'owner')

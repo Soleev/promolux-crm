@@ -93,11 +93,11 @@ class CrmForms
                 Select::make('manager_id')->label('Ответственный')->options(fn () => User::where('active', true)->when(auth()->user()->handlesOwnOrders(), fn ($q) => $q->whereKey(auth()->id()))->pluck('name', 'id'))->default(fn () => auth()->id())->required(),
                 DateTimePicker::make('due_at')->native(false)->displayFormat('d.m.Y H:i')->label('Срок')->seconds(false)->required(),
                 Select::make('status')->label('Статус')->options(self::taskStatuses())->default('open')->required(),
-                self::relation('client_id', Client::class, 'Клиент'), self::relation('deal_id', Deal::class, 'Сделка', 'title'), self::relation('order_id', Order::class, 'Заказ', 'number'), $notes(),
+                self::relation('client_id', Client::class, 'Клиент'), self::relation('deal_id', Deal::class, 'Сделка', 'title'), OrderSelect::make(), $notes(),
             ],
             Payment::class => [
                 Hidden::make('idempotency_key')->default(fn () => (string) Str::uuid()),
-                self::relation('order_id', Order::class, 'Заказ', 'number', true),
+                OrderSelect::make(true),
                 DatePicker::make('paid_at')->native(false)->displayFormat('d.m.Y')->label('Дата оплаты в SFP')->default(today())->maxDate(today())->required(),
                 self::money(),
                 Select::make('owner_id')->hidden(fn () => auth()->user()->role === 'designer')->label('Получатель доли владельца')->options(fn () => User::where('role', 'owner')->where('active', true)->pluck('name', 'id'))->default(fn () => auth()->id()),
@@ -118,7 +118,7 @@ class CrmForms
                 DatePicker::make('paid_at')->native(false)->displayFormat('d.m.Y')->label('Дата')->default(today())->required(),
                 TextInput::make('category')->label('Категория')->required(), self::money(),
                 Select::make('payer')->label('Плательщик')->options(['SFP' => 'SFP', 'Promolux' => 'Promolux'])->default('SFP')->required(),
-                self::relation('order_id', Order::class, 'Заказ', 'number'), $notes(),
+                OrderSelect::make(), $notes(),
             ],
             User::class => [
                 TextInput::make('name')->label('Имя')->required(), TextInput::make('email')->label('Email')->email()->required(),

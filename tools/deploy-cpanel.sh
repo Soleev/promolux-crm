@@ -18,7 +18,7 @@ test "$(df -Pk "$base" | awk 'NR==2 {print $4}')" -ge 307200 || { echo 'Need at 
 mkdir -p "$base/releases"
 release="$base/releases/$commit"
 test ! -e "$release" || { echo 'Release exists; inspect it manually, never overwrite'; exit 1; }
-mkdir "$release"
+mkdir -m 700 "$release"
 git archive HEAD | tar -x -C "$release"
 cd "$release"
 mv storage storage-template
@@ -30,6 +30,17 @@ ln -s "$base/shared/.env" .env
 "$PHP_BIN" artisan config:cache
 "$PHP_BIN" artisan route:cache
 "$PHP_BIN" artisan view:cache
+test -f public/index.php && test -f public/.htaccess || { echo 'Missing public entry point or rewrite rules'; exit 1; }
+test -d public && test ! -L public
+if [[ -n "$(find public ! -type d ! -type f -print -quit)" ]]; then
+    echo 'Unexpected link or special file in public directory'; exit 1
+fi
+# PHP runs as the cPanel account. Protect private entries before opening the
+# traversal path for Apache. Never chmod shared storage or the linked .env.
+find . -mindepth 1 -maxdepth 1 ! -name public ! -type l -exec chmod go-rwx {} +
+find public -type d -exec chmod 755 {} +
+find public -type f -exec chmod 644 {} +
+chmod 711 "$release"
 "$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); if(config("app.version")!=="0.3.2" || config("app.debug") || config("database.default")!=="mariadb") exit(1); echo "Promolux ".config("app.version").PHP_EOL;'
 # First deployment deliberately stops before serving an uninitialized database.
 test -f "$base/installation-ready" || { echo "Prepared $release. Complete first-install checks in docs/deployment.md before activation."; exit 1; }

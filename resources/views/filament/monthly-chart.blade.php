@@ -16,7 +16,7 @@
     $x = fn ($index) => 62 + $step * ($index + 0.5);
     $colors = ['#6366f1', '#0d9488', '#d97706'];
     $amount = fn ($value) => \App\Services\Money::display($value);
-    $points = implode(' ', array_map(fn ($index) => $x($index).','.$y($months[$index]['balance']), array_keys($months)));
+    $points = isset($series['balance']) ? implode(' ', array_map(fn ($index) => $x($index).','.$y($months[$index]['balance']), array_keys($months))) : '';
 @endphp
 <x-filament::section :heading="$heading">
     <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">

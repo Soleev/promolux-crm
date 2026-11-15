@@ -6,7 +6,9 @@
     </div>
     <div class="grid gap-4 rounded-xl bg-white p-4 shadow-sm md:grid-cols-4 dark:bg-gray-900">
         <div class="md:col-span-3">{{ $this->filtersForm }}</div>
+        @if(auth()->user()->role === 'owner')
         <div class="flex items-end"><x-filament::button tag="a" :href="route('crm.export', ['from'=>$from,'until'=>$until,'manager'=>$manager])" icon="heroicon-o-arrow-down-tray">Скачать реестр CSV</x-filament::button></div>
+        @endif
     </div>
     @error('until')<p class="text-red-600">{{ $message }}</p>@enderror
     @include('filament.financial-summary')
@@ -15,7 +17,7 @@
         <x-filament::section><p class="text-sm text-gray-500 dark:text-gray-400">{{ $label }}</p><p class="mt-2 text-3xl font-semibold">{{ $this->report[$key] }}</p></x-filament::section>
         @endforeach
     </div>
-    @if($this->report['unresolved'])
+    @if(auth()->user()->role === 'owner' && $this->report['unresolved'])
     <x-filament::section><p class="text-amber-600">Оплат без согласованного распределения: {{ $this->report['unresolved'] }}. Начисления по ним не созданы; требуется уточнение условий.</p></x-filament::section>
     @endif
     @if(!$this->report['orders'])
@@ -35,12 +37,15 @@
     @if($this->chartMonths)
     <div class="grid gap-6 xl:grid-cols-2">
         @include('filament.monthly-chart', ['heading'=>'Заказы и оплаты клиентов', 'months'=>$this->chartMonths, 'currency'=>'сум', 'series'=>['orders'=>'Стоимость заказов', 'payments'=>'Клиенты оплатили в SFP']])
+        @if(auth()->user()->role !== 'rop')
         @include('filament.monthly-chart', ['heading'=>match(auth()->user()->role){'manager'=>'Моё вознаграждение', 'rop'=>'Мои расчёты с SFP', default=>'Расчёты с SFP'}, 'months'=>$this->chartMonths, 'currency'=>'сум', 'series'=>['earned'=>'Начислено', 'paid'=>'Погашено', 'balance'=>'Остаток на конец периода']])
+        @endif
     </div>
     <p class="text-xs text-gray-500 dark:text-gray-400">Заказы показаны по дате оформления, оплаты и выплаты — по дате поступления. Остаток учитывает долг до начала периода.</p>
     @else
     <p>Выберите обе даты для построения графиков.</p>
     @endif
+    @if(auth()->user()->role === 'owner')
     <x-filament::section heading="Реестр начислений и сверка">
         <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Начисления по оплатам выбранного периода. Выплаты и остатки — по выбранную конечную дату. Полный реестр доступен в CSV.</p>
         <div class="overflow-x-auto">
@@ -58,4 +63,5 @@
         </tbody></table>
         </div>
     </x-filament::section>
+    @endif
 </x-filament-panels::page>

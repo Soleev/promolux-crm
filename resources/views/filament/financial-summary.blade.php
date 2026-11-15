@@ -4,18 +4,16 @@
     $cards = ['order_total' => 'Заказы за период', 'client_payments' => 'Оплачено клиентами в SFP'];
     $cards += match ($role) {
         'owner' => ['sfp_remaining' => 'К получению от SFP', 'manager_remaining' => 'К выплате менеджерам'],
-        'rop' => ['sfp_remaining' => 'Мне к получению от SFP', 'rop_net' => 'Моя доля за период'],
+        'rop' => ['rop_net' => 'Моё вознаграждение за период'],
         default => ['manager_accrued' => 'Мне начислено за период', 'manager_remaining' => 'Мне осталось получить'],
     };
     $groups = [];
     if ($role === 'owner') {
         $groups['Владелец и РОП'] = ['owner_gross'=>'Начислено владельцу от SFP', 'owner_net'=>'Доля владельца после менеджера', 'rop_gross'=>'Начислено РОП от SFP', 'rop_net'=>'Доля РОП после менеджера'];
-    } elseif ($role === 'rop') {
-        $groups['Моя доля'] = ['rop_gross'=>'Начислено от SFP', 'rop_net'=>'После вознаграждения менеджеру'];
     }
     $groups['Выплаты'] = match ($role) {
         'owner' => ['sfp_paid'=>'Перечислено SFP', 'manager_accrued'=>'Начислено менеджерам', 'manager_paid'=>'Выплачено менеджерам'],
-        'rop' => ['sfp_paid'=>'Погашено по моим начислениям'],
+        'rop' => [],
         default => ['manager_paid'=>'Мне выплачено'],
     };
     if ($role === 'owner') {
@@ -35,6 +33,7 @@
     @if(!$this->report['period_payment_count'])
         <p class="text-sm text-gray-600 dark:text-gray-400">Оплат в SFP за период пока нет. Вознаграждение начисляется после поступления денег в SFP.</p>
     @endif
+    @if($role !== 'rop')
     <details class="group rounded-xl bg-white px-4 shadow-sm dark:bg-gray-900">
         <summary class="cursor-pointer py-3 text-sm font-semibold text-indigo-700 dark:text-indigo-300">
             <span class="group-open:hidden">Показать детализацию</span><span class="hidden group-open:inline">Скрыть детализацию</span>
@@ -52,4 +51,5 @@
             @endforeach
         </div>
     </details>
+    @endif
 </section>

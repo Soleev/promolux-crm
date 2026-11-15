@@ -14,12 +14,23 @@ use App\Models\Task;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 
 class RecordDetails
 {
     public static function get(Model $record): array
     {
+        Gate::authorize('view', $record);
+        $owner = auth()->user()->role === 'owner';
         $attributes = collect($record->getAttributes())->except(['password', 'remember_token', 'idempotency_key', 'attachment', 'document'])->all();
+        if (! $owner) {
+            foreach (['kind', 'payer', 'rate_bps', 'calculation_status'] as $privateField) {
+                unset($attributes[$privateField]);
+            }
+            if ($record instanceof Payout) {
+                unset($attributes['notes']);
+            }
+        }
         foreach (['amount_minor', 'price_minor'] as $key) {
             if (isset($attributes[$key])) {
                 $attributes[$key] = Money::display((int) $attributes[$key]);
@@ -64,10 +75,10 @@ class RecordDetails
                 }
             }
         }
-        if ($record instanceof Payment) {
+        if ($owner && $record instanceof Payment) {
             $details['accruals'] = CrmAccess::query(Accrual::class)->where('payment_id', $record->id)->with('beneficiary')->get();
         }
-        if ($record instanceof Payout) {
+        if ($owner && $record instanceof Payout) {
             $details['allocations'] = $record->allocations()->with('accrual.beneficiary')->get();
         }
         if (in_array($record::class, [Client::class, Deal::class, Order::class, Task::class]) || auth()->user()->role === 'owner') {

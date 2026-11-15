@@ -16,6 +16,7 @@ class Report
 {
     public function build(User $user, ?string $from, ?string $until, ?int $manager = null): array
     {
+        abort_unless($user->active && in_array($user->role, ['owner', 'rop', 'manager'], true), 403);
         $until ??= today()->toDateString();
         if ($user->role === 'manager') {
             $manager = $user->id;
@@ -54,18 +55,28 @@ class Report
             'promolux_expenses' => $user->role === 'owner' ? $expense('Promolux') : 0,
         ];
 
+        if ($user->role !== 'owner') {
+            $personal = match ($user->role) {
+                'manager' => ['manager_accrued', 'manager_paid', 'manager_remaining'],
+                'rop' => ['rop_net'],
+                default => [],
+            };
+            $totals = array_intersect_key($totals, array_flip(['order_total', 'client_payments', ...$personal]));
+        }
+
         return [
             'currencies' => ['UZS' => $totals],
             'orders' => (clone $orders)->count(),
             'period_payment_count' => $within((clone $payments)->whereNull('reversal_of'), 'paid_at')->count(),
             'active_orders' => (clone $orders)->whereNotIn('status', ['delivered', 'cancelled'])->count(),
             'overdue_tasks' => CrmAccess::query(Task::class, $user)->when($manager, fn ($q) => $q->where('manager_id', $manager))->whereNotIn('status', ['done', 'cancelled'])->where('due_at', '<', now())->count(),
-            'unresolved' => (clone $payments)->where('calculation_status', 'needs_clarification')->whereNull('reversal_of')->whereNotIn('id', Payment::whereNotNull('reversal_of')->select('reversal_of'))->count(),
+            'unresolved' => $user->role !== 'owner' ? 0 : (clone $payments)->where('calculation_status', 'needs_clarification')->whereNull('reversal_of')->whereNotIn('id', Payment::whereNotNull('reversal_of')->select('reversal_of'))->count(),
         ];
     }
 
     public function register(User $user, ?string $from, ?string $until, ?int $manager = null): Collection
     {
+        abort_unless($user->active && $user->role === 'owner', 403);
         $until ??= today()->toDateString();
 
         return CrmAccess::query(Accrual::class, $user)->whereHas('payment', fn ($q) => $q->whereDate('paid_at', '<=', $until)->when($from, fn ($q) => $q->whereDate('paid_at', '>=', $from))->when($manager, fn ($q) => $q->where('manager_id', $manager)))

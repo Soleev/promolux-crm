@@ -79,7 +79,7 @@ class CashReceiptResource extends Resource
                 DatePicker::make('collected_at')->native(false)->displayFormat('d.m.Y')->label('Дата получения от клиента')->default(today())->maxDate(today())->required(),
                 Select::make('collector_id')->label('Кто принял у клиента')->visible(fn () => auth()->user()->role === 'owner')
                     ->options(fn () => User::where('active', true)->whereIn('role', ['owner', 'rop', 'manager', 'designer'])->pluck('name', 'id'))->default(fn () => auth()->id())->required(),
-                $recipient('owner', 'Владелец для начисления'), $recipient('rop', 'РОП для начисления'),
+                $recipient('owner', 'Владелец'), $recipient('rop', 'Руководитель отдела продаж'),
             ])->action(fn (array $data) => app(CashDesk::class)->collect($data));
     }
 

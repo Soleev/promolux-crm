@@ -40,7 +40,7 @@ class CrmForms
             ->options(fn (?Model $record) => CrmAccess::salesAssignees(auth()->user(), $record)->orderBy('name')->pluck('name', 'id'))
             ->default(fn () => auth()->user()->handlesOwnOrders() ? auth()->id() : null)
             ->required($required)->disabled(fn () => auth()->user()->handlesOwnOrders())->dehydrated()->searchable()
-            ->helperText('Если заказ ведёт сам владелец или ответственный не выбран, распределение комиссии требует уточнения.');
+            ->helperText('Выберите сотрудника, ответственного за заказ.');
     }
 
     public static function relation(string $field, string $model, string $label, string $title = 'name', bool $required = false): Select

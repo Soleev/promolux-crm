@@ -109,6 +109,9 @@ abstract class CrmResource extends Resource
             User::class => [$text('name', 'Сотрудник'), $text('email', 'Email'), $text('role', 'Роль')->formatStateUsing(fn ($state) => User::ROLE_LABELS[$state] ?? $state), TextColumn::make('active')->label('Доступ')->badge()->color(fn ($state) => $state ? 'success' : 'gray')->formatStateUsing(fn ($state) => $state ? 'Разрешён' : 'Отключён')],
             Activity::class => [TextColumn::make('created_at')->label('Дата')->dateTime('d.m.Y H:i:s')->sortable(), $text('actor.name', 'Пользователь'), $text('subject_type', 'Объект'), TextColumn::make('subject_id')->label('№ записи'), $text('event', 'Действие')],
         };
+        if (auth()->user()->role !== 'owner') {
+            $columns = array_values(array_filter($columns, fn ($column) => ! in_array($column->getName(), ['kind', 'payer', 'calculation_status', 'payment.order.number'], true)));
+        }
         $actions = [
             Action::make('details')->label('Подробнее')->modalHeading('Карточка записи')->modalSubmitAction(false)
                 ->modalContent(function (Model $record) {
@@ -175,7 +178,9 @@ abstract class CrmResource extends Resource
                 });
         }
         if ($model === Payment::class) {
-            $filters[] = SelectFilter::make('calculation_status')->label('Расчёт комиссии')->options(['calculated' => 'Начислено', 'needs_clarification' => 'Требует уточнения']);
+            if (auth()->user()->role === 'owner') {
+                $filters[] = SelectFilter::make('calculation_status')->label('Расчёт комиссии')->options(['calculated' => 'Начислено', 'needs_clarification' => 'Требует уточнения']);
+            }
             $filters[] = SelectFilter::make('method')->label('Способ оплаты')->options(['Перечисление' => 'Перечисление', 'Наличные через кассира' => 'Наличные через кассира']);
         }
         if ($model === Expense::class) {

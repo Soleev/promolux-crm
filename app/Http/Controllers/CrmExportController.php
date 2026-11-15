@@ -11,7 +11,7 @@ class CrmExportController extends Controller
 {
     public function __invoke(Request $request, Report $report): StreamedResponse
     {
-        abort_unless($request->user()->active && ! in_array($request->user()->role, ['cashier', 'designer'], true), 403);
+        abort_unless($request->user()->active && $request->user()->role === 'owner', 403);
         $data = $request->validate(['from' => 'nullable|date', 'until' => 'nullable|date|after_or_equal:from', 'manager' => 'nullable|integer']);
         $rows = $report->register($request->user(), $data['from'] ?? null, $data['until'] ?? null, isset($data['manager']) ? (int) $data['manager'] : null);
 

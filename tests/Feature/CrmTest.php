@@ -55,7 +55,7 @@ it('distributes ten million only after receipt and keeps the original recipients
     $this->assertDatabaseHas('accruals', ['kind' => 'manager_rop', 'beneficiary_id' => $manager->id, 'rate_bps' => 250]);
     $totals = app(Report::class)->build($owner, null, null)['currencies']['UZS'];
     expect($totals)->toMatchArray(['owner_net' => 25000000, 'rop_net' => 25000000, 'manager_accrued' => 50000000, 'sfp_remaining' => 100000000, 'manager_remaining' => 50000000]);
-    expect(app(Report::class)->register($newManager, null, null))->toBeEmpty();
+    expect(fn () => app(Report::class)->register($newManager, null, null))->toThrow(HttpException::class);
 });
 
 it('accrues only each instalment and rejects foreign currency and separates expense payers', function () {
@@ -113,11 +113,11 @@ it('restricts manager lists, documents, exports, actions and dashboard values to
     $this->get('/crm/expenses')->assertForbidden();
     $this->get('/crm/users')->assertForbidden();
     $this->get('/crm/overview')->assertOk()->assertDontSee('Начислено владельцу от SFP');
-    expect($this->get('/crm-register.csv?manager='.$manager->id)->streamedContent())->not->toContain($order->number);
+    $this->get('/crm-register.csv?manager='.$manager->id)->assertForbidden();
     expect(fn () => app(CrmWriter::class)->save(Order::class, [], $order))->toThrow(AuthorizationException::class);
     $this->actingAs($rop)->get('/crm/overview')->assertOk()->assertDontSee('Доля владельца после менеджера');
     $this->actingAs($manager);
-    expect(app(Report::class)->register($manager, null, null))->toHaveCount(2);
+    expect(fn () => app(Report::class)->register($manager, null, null))->toThrow(HttpException::class);
 });
 
 it('renders all panel sections and creates a client through its Filament form', function () {

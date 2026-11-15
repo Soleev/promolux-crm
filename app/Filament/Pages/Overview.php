@@ -52,7 +52,11 @@ class Overview extends Page
             return [];
         }
 
-        return app(MonthlyCharts::class)->build(auth()->user(), $this->from, $this->until, $this->manager ? (int) $this->manager : null, $this->chartInterval);
+        $months = app(MonthlyCharts::class)->build(auth()->user(), $this->from, $this->until, $this->manager ? (int) $this->manager : null, $this->chartInterval);
+
+        return auth()->user()->role === 'rop'
+            ? array_map(fn ($row) => array_intersect_key($row, array_flip(['orders', 'payments', 'label'])), $months)
+            : $months;
     }
 
     public static function canAccess(): bool

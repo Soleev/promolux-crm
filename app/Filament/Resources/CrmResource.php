@@ -100,7 +100,7 @@ abstract class CrmResource extends Resource
         $columns = match ($model) {
             Client::class => [$text('name', 'Клиент'), $text('phone', 'Телефон'), $text('manager.name', 'Менеджер'), $text('source', 'Источник')],
             Deal::class => [$text('title', 'Сделка'), $text('client.name', 'Клиент'), $text('manager.name', 'Менеджер'), $text('status', 'Этап')->formatStateUsing(fn ($state) => CrmForms::dealStatuses()[$state] ?? $state)->badge()->color(fn ($state) => CrmTableUi::color($state)), $text('currency', 'Валюта')],
-            Order::class => [$text('number', 'Заказ'), $text('client.name', 'Клиент'), $text('manager.name', 'Менеджер'), $money('total_minor', 'Стоимость'), $text('currency', 'Валюта'), $text('status', 'Производство')->formatStateUsing(fn ($state) => CrmForms::orderStatuses()[$state] ?? $state)->badge()->color(fn ($state) => CrmTableUi::color($state)), TextColumn::make('payment_status')->label('Оплата')->badge()->color(fn ($state) => CrmTableUi::color($state)), TextColumn::make('due_at')->label('Срок')->date('d.m.Y')->sortable()],
+            Order::class => Orders\OrderResource::orderColumns($text),
             Task::class => [$text('title', 'Задача'), $text('manager.name', 'Ответственный'), TextColumn::make('due_at')->label('Срок')->dateTime('d.m.Y H:i')->sortable()->color(fn ($record) => $record->due_at->isPast() && ! in_array($record->status, ['done', 'cancelled']) ? 'danger' : null), $text('status', 'Статус')->formatStateUsing(fn ($state) => CrmForms::taskStatuses()[$state] ?? $state)->badge()->color(fn ($state) => CrmTableUi::color($state))],
             Payment::class => [$text('order.number', 'Заказ'), TextColumn::make('paid_at')->label('Дата оплаты')->date('d.m.Y')->sortable(), $money('amount_minor', 'Оплачено SFP'), TextColumn::make('method')->label('Способ оплаты')->searchable(), $text('currency', 'Валюта'), $text('manager.name', 'Менеджер'), TextColumn::make('calculation_status')->label('Расчёт')->formatStateUsing(fn ($state) => $state === 'calculated' ? 'Начислено' : 'Требует уточнения')->badge()->color(fn ($state) => CrmTableUi::color($state)), TextColumn::make('reversal_of')->label('Сторно оплаты №')],
             Accrual::class => [TextColumn::make('id')->label('№'), $text('payment.order.number', 'Заказ'), TextColumn::make('payment.paid_at')->label('Дата оплаты')->date('d.m.Y')->sortable(), $text('beneficiary.name', 'Получатель'), $text('kind', 'Начисление')->formatStateUsing(fn ($state) => CrmForms::kindLabels()[$state] ?? $state), $money('amount_minor', 'Начислено'), $money('outstanding_minor', 'Остаток'), $text('currency', 'Валюта')],
@@ -110,7 +110,7 @@ abstract class CrmResource extends Resource
             Activity::class => [TextColumn::make('created_at')->label('Дата')->dateTime('d.m.Y H:i:s')->sortable(), $text('actor.name', 'Пользователь'), $text('subject_type', 'Объект'), TextColumn::make('subject_id')->label('№ записи'), $text('event', 'Действие')],
         };
         if (auth()->user()->role !== 'owner') {
-            $columns = array_values(array_filter($columns, fn ($column) => ! in_array($column->getName(), ['kind', 'payer', 'calculation_status', 'payment.order.number'], true)));
+            $columns = array_values(array_filter($columns, fn ($column) => ! $column instanceof TextColumn || ! in_array($column->getName(), ['kind', 'payer', 'calculation_status', 'payment.order.number'], true)));
         }
         $actions = [
             Action::make('details')->label('Подробнее')->modalHeading('Карточка записи')->modalSubmitAction(false)
@@ -119,7 +119,14 @@ abstract class CrmResource extends Resource
 
                     return view('filament.record', ['record' => $record, 'details' => RecordDetails::get($record)]);
                 }),
-            EditAction::make()->visible(fn (Model $record) => static::canEdit($record))
+            EditAction::make()
+                ->when($model === Order::class,
+                    // Table records are already scoped. Recheck the policy when opening the form;
+                    // CrmWriter also authorizes the record when saving.
+                    fn (EditAction $action) => $action->authorize(fn () => CrmAccess::manage(auth()->user(), Order::class))
+                        ->beforeFormFilled(fn (Order $record) => Gate::authorize('update', $record)),
+                    fn (EditAction $action) => $action->visible(fn (Model $record) => static::canEdit($record)),
+                )
                 ->mutateRecordDataUsing(fn (array $data, Model $record) => CrmForms::editData($data, $record))
                 ->using(fn (Model $record, array $data) => app(CrmWriter::class)->save(static::getModel(), $data, $record)),
         ];

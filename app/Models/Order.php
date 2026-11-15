@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\Money;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable(['number', 'client_id', 'deal_id', 'manager_id', 'currency', 'status', 'due_at', 'description', 'attachment'])]
 class Order extends Model
@@ -42,8 +45,20 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function scopeWithPaymentTotals(Builder $query): Builder
+    {
+        return $query
+            ->withSum('items as ordered_minor', DB::raw('quantity * price_minor'))
+            ->withSum(['payments as confirmed_minor' => fn (Builder $payments) => $payments->whereColumn('payments.currency', 'orders.currency')], 'amount_minor')
+            ->withSum(['cashReceipts as pending_minor' => fn (Builder $cash) => $cash->where('status', 'pending')], 'amount_minor');
+    }
+
     public function getTotalMinorAttribute(): int
     {
+        if (array_key_exists('ordered_minor', $this->attributes)) {
+            return (int) $this->ordered_minor;
+        }
+
         return $this->items->sum(fn ($item) => $item->quantity * $item->price_minor);
     }
 
@@ -54,7 +69,16 @@ class Order extends Model
 
     public function getPaidMinorAttribute(): int
     {
-        return (int) $this->payments()->sum('amount_minor') + (int) $this->cashReceipts()->where('status', 'pending')->sum('amount_minor');
+        if (array_key_exists('confirmed_minor', $this->attributes)) {
+            return (int) $this->confirmed_minor + (int) $this->pending_minor;
+        }
+
+        return (int) $this->payments()->where('currency', $this->currency)->sum('amount_minor') + (int) $this->cashReceipts()->where('status', 'pending')->sum('amount_minor');
+    }
+
+    public function displayAmount(int $minor): string
+    {
+        return $this->currency === 'UZS' ? Money::display($minor) : Money::format($minor).' '.$this->currency;
     }
 
     public function getPaymentStatusAttribute(): string

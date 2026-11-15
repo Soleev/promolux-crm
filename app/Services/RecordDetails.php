@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Filament\CrmForms;
+use App\Filament\Resources\CashReceipts\CashReceiptResource;
 use App\Models\Accrual;
 use App\Models\Activity;
 use App\Models\Client;
@@ -22,7 +23,7 @@ class RecordDetails
     {
         Gate::authorize('view', $record);
         $owner = auth()->user()->role === 'owner';
-        $attributes = collect($record->getAttributes())->except(['password', 'remember_token', 'idempotency_key', 'attachment', 'document'])->all();
+        $attributes = collect($record->getAttributes())->except(['password', 'remember_token', 'idempotency_key', 'attachment', 'document', 'ordered_minor', 'confirmed_minor', 'pending_minor'])->all();
         if (! $owner) {
             foreach (['kind', 'payer', 'rate_bps', 'calculation_status'] as $privateField) {
                 unset($attributes[$privateField]);
@@ -63,10 +64,10 @@ class RecordDetails
         }
         $details = ['fields' => $attributes, 'items' => [], 'related' => [], 'history' => [], 'accruals' => [], 'allocations' => []];
         if ($record instanceof Order) {
-            $details['items'] = $record->items->map(fn ($i) => ['name' => $i->name, 'quantity' => $i->quantity, 'price' => Money::display($i->price_minor), 'total' => Money::display($i->price_minor * $i->quantity)])->all();
-            $details['fields']['total'] = Money::display($record->total_minor);
-            $details['fields']['payment_status'] = $record->payment_status;
-            $details['related'] = CrmAccess::query(Payment::class)->where('order_id', $record->id)->get()->map(fn ($p) => 'Оплата #'.$p->id.' · '.$p->paid_at->format('d.m.Y').' · '.Money::display($p->amount_minor))->all();
+            $details['items'] = $record->items->map(fn ($i) => ['name' => $i->name, 'quantity' => $i->quantity, 'price' => $record->displayAmount($i->price_minor), 'total' => $record->displayAmount($i->price_minor * $i->quantity)])->all();
+            $details['balanceOrder'] = CrmAccess::query(Order::class)->withPaymentTotals()->findOrFail($record->id);
+            $details['payments'] = CrmAccess::query(Payment::class)->where('order_id', $record->id)->where('currency', $record->currency)->latest('paid_at')->latest('id')->get();
+            $details['pendingCash'] = CashReceiptResource::getEloquentQuery()->withoutEagerLoads()->where('order_id', $record->id)->where('status', 'pending')->latest('collected_at')->get();
         }
         if ($record instanceof Client) {
             foreach ([Deal::class => 'Сделка', Order::class => 'Заказ', Task::class => 'Задача'] as $model => $label) {

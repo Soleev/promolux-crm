@@ -41,7 +41,7 @@ find . -mindepth 1 -maxdepth 1 ! -name public ! -type l -exec chmod go-rwx {} +
 find public -type d -exec chmod 755 {} +
 find public -type f -exec chmod 644 {} +
 chmod 711 "$release"
-"$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); if(config("app.version")!=="0.3.2" || config("app.debug") || config("database.default")!=="mariadb") exit(1); echo "Promolux ".config("app.version").PHP_EOL;'
+"$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); if(config("app.version")!=="0.3.3" || config("app.debug") || config("database.default")!=="mariadb") exit(1); echo "Promolux ".config("app.version").PHP_EOL;'
 # First deployment deliberately stops before serving an uninitialized database.
 test -f "$base/installation-ready" || { echo "Prepared $release. Complete first-install checks in docs/deployment.md before activation."; exit 1; }
 test -L "$HOME/public_html/promolux"

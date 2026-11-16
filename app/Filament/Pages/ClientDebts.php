@@ -27,11 +27,11 @@ class ClientDebts extends Page implements HasTable
 
     protected static ?string $title = 'Долги клиентов';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Продажи';
+    protected static string|\UnitEnum|null $navigationGroup = 'Финансы';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?int $navigationSort = 35;
+    protected static ?int $navigationSort = 5;
 
     protected string $view = 'filament.pages.client-debts';
 

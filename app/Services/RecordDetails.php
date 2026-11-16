@@ -22,6 +22,10 @@ class RecordDetails
     public static function get(Model $record): array
     {
         Gate::authorize('view', $record);
+        if ($record instanceof Activity) {
+            return ['fields' => [], 'items' => [], 'related' => [], 'accruals' => [], 'allocations' => [],
+                'history' => ActivityHistory::journal(collect([$record->loadMissing('actor:id,name')]))];
+        }
         $owner = auth()->user()->role === 'owner';
         $attributes = collect($record->getAttributes())->except(['password', 'remember_token', 'idempotency_key', 'attachment', 'document', 'ordered_minor', 'confirmed_minor', 'pending_minor'])->all();
         if (! $owner) {
@@ -70,6 +74,9 @@ class RecordDetails
             $details['pendingCash'] = CashReceiptResource::getEloquentQuery()->withoutEagerLoads()->where('order_id', $record->id)->where('status', 'pending')->latest('collected_at')->get();
         }
         if ($record instanceof Client) {
+            if (isset($attributes['contacts'])) {
+                $details['fields']['contacts'] = ActivityHistory::formatList('contacts', $attributes['contacts']);
+            }
             foreach ([Deal::class => 'Сделка', Order::class => 'Заказ', Task::class => 'Задача'] as $model => $label) {
                 foreach (CrmAccess::query($model)->where('client_id', $record->id)->get() as $r) {
                     $details['related'][] = $label.' #'.$r->id.' · '.($r->number ?? $r->title);
@@ -83,7 +90,7 @@ class RecordDetails
             $details['allocations'] = $record->allocations()->with('accrual.beneficiary')->get();
         }
         if (in_array($record::class, [Client::class, Deal::class, Order::class, Task::class]) || auth()->user()->role === 'owner') {
-            $details['history'] = Activity::where('subject_type', $record::class)->where('subject_id', $record->id)->with('actor')->latest('id')->limit(50)->get();
+            $details['history'] = ActivityHistory::forRecord($record);
         }
 
         return $details;

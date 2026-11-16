@@ -12,7 +12,7 @@
     <dl class="grid gap-3 sm:grid-cols-2">
     @foreach($details['fields'] as $key=>$value)
         @if($value !== null && $value !== '' && $key!=='items')
-        <div><dt class="text-xs text-gray-500">{{ $labels[$key] ?? $key }}</dt><dd class="break-words text-sm">{{ is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE) : $value }}</dd></div>
+        <div><dt class="text-xs text-gray-500">{{ $labels[$key] ?? $key }}</dt><dd class="whitespace-pre-line break-words text-sm">{{ is_array($value) ? 'Подробности недоступны' : $value }}</dd></div>
         @endif
     @endforeach
     </dl>
@@ -53,11 +53,6 @@
     @endforeach
     @if(count($details['history']))
         <h3 class="font-semibold">История изменений и общения</h3>
-        @foreach($details['history'] as $event)
-        <details class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <summary class="text-sm">{{ $event->created_at->format('d.m.Y H:i') }} · {{ $event->actor?->name ?? 'Система' }} · {{ ['created'=>'Создано','updated'=>'Изменено','communication'=>'Общение','items_replaced'=>'Позиции заказа','converted'=>'Создан заказ','account_saved'=>'Учётная запись'][$event->event] ?? $event->event }}</summary>
-            <pre class="mt-2 whitespace-pre-wrap break-words text-xs">{{ json_encode($event->changes,JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT) }}</pre>
-        </details>
-        @endforeach
+        @include('filament.activity-list', ['events' => $details['history']])
     @endif
 </div>

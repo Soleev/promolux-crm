@@ -1,4 +1,6 @@
 """Release gate: scan publishable files and EVERY reachable Git blob. No values printed."""
+import argparse
+import hashlib
 import re
 import subprocess
 import sys
@@ -9,6 +11,34 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def git(*args):
     return subprocess.check_output(['git', '-C', str(ROOT), *args])
+
+
+# The release identity is public only in the two email fields of one approved commit.
+RELEASE_PARENT = '6b898759aeab14265d366e221847a8b3b1963f20'
+EMAIL_DIGEST = '0fafc21188c42cb180d371c2ee6f25bb3b28bfdf133dfd2f4a91b18d477386d6'
+
+def release_email(value):
+    return hashlib.sha256(value).hexdigest() == EMAIL_DIGEST
+
+
+def commit_metadata(sha, approved_sha):
+    raw = git('cat-file', 'commit', sha)
+    if sha != approved_sha:
+        return raw
+    headers, separator, message = raw.partition(b'\n\n')
+    lines = headers.split(b'\n')
+    if [line[7:] for line in lines if line.startswith(b'parent ')] != [RELEASE_PARENT.encode()]:
+        raise ValueError('Identity approval requires the single v0.3.4 parent')
+    for field in (b'author', b'committer'):
+        indices = [i for i, line in enumerate(lines) if line.startswith(field + b' ')]
+        if len(indices) != 1:
+            raise ValueError('Unexpected identity headers')
+        i = indices[0]
+        match = re.fullmatch(field + rb' Shoxrux Soleyev <([^<>\s]+)> [0-9]+ [+-][0-9]{4}', lines[i])
+        if not match or not release_email(match[1]):
+            raise ValueError('Unexpected release identity')
+        lines[i] = lines[i][:match.start(1)] + lines[i][match.end(1):]
+    return b'\n'.join(lines) + separator + message
 
 
 def check(name, data):
@@ -41,13 +71,19 @@ def check(name, data):
     for kind, pattern in patterns.items():
         # Dependency attribution belongs to upstream maintainers, not CRM users.
         if kind == 'personal-email' and name in ('composer.lock', 'package-lock.json'):
-            continue
+            if not any(release_email(addr.lower().encode()) for addr in re.findall(pattern, text)):
+                continue
         if re.search(pattern, text):
             problems.append(kind)
     return [(name, kind) for kind in problems]
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--identity-commit', help='Exact full SHA approved for the v0.3.5 release identity')
+    approved = parser.parse_args().identity_commit
+    if approved and not re.fullmatch('[0-9a-f]{40}', approved):
+        parser.error('Expected a full lowercase SHA')
     files = git('ls-files', '--cached', '--others', '--exclude-standard', '-z').decode().split('\0')
     errors = []
     for name in filter(None, files):
@@ -66,7 +102,11 @@ def main():
             if git('cat-file', '-t', sha).strip() == b'blob':
                 blobs += 1
                 errors.extend(check(name, git('cat-file', 'blob', sha)))
-        errors.extend(check('git-metadata', git('log', '--all', '--format=%an <%ae>%n%cn <%ce>%n%B')))
+        reachable = git('rev-list', '--all').decode().splitlines()
+        if approved and approved not in reachable:
+            parser.error('Approved commit is not reachable')
+        for sha in reachable:
+            errors.extend(check('git-metadata', commit_metadata(sha, approved)))
     for name, kind in sorted(set(errors)):
         print(f'BLOCKED {kind}: {name}')
     print(f'Files: {len(list(filter(None, files)))}; commits: {commits}; history blobs: {blobs}; findings: {len(errors)}')

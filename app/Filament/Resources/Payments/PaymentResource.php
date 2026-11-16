@@ -15,7 +15,7 @@ class PaymentResource extends CrmResource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Финансы';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-building-library';
 
     public static function getPages(): array
     {

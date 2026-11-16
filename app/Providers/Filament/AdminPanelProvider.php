@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\About;
+use App\Filament\Pages\Help;
 use App\Filament\Pages\Overview;
 use App\Http\Middleware\RolePreview;
 use Filament\Actions\Action;
@@ -25,13 +26,18 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
+        foreach (Help::TOPICS as $topic => $scope) {
+            $panel->renderHook(PanelsRenderHook::PAGE_HEADER_ACTIONS_AFTER,
+                fn () => view('filament.help-link', ['topic' => $topic]), scopes: $scope);
+        }
+
         return $panel
             ->default()
             ->id('admin')
             ->path('crm')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName('Promolux')
-            ->navigationGroups(['Главная', 'Продажи', 'Финансы', 'Управление'])
+            ->navigationGroups(['Главная', 'Продажи', 'Финансы', 'Управление', 'Справка'])
             ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_BEFORE, fn () => view('filament.header-status'))
             ->userMenuItems([
                 Action::make('about')->label('О программе')->icon('heroicon-o-information-circle')->url(fn () => About::getUrl()),

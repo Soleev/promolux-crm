@@ -1,4 +1,4 @@
-# Promolux CRM v0.3.5 — История действий
+# Promolux CRM v0.3.6 — Мой день и помощь по ролям
 
 CRM для полиграфии: клиенты, сделки и Kanban, заказы, касса и учёт вознаграждений SFP. Laravel 13, Filament 5, Livewire 4, PHP 8.5. Валюта UZS, время Asia/Tashkent.
 

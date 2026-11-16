@@ -14,7 +14,8 @@ def git(*args):
 
 
 # The release identity is public only in the two email fields of one approved commit.
-RELEASE_PARENT = '6b898759aeab14265d366e221847a8b3b1963f20'
+RELEASE_035 = '75271a4d53e62dad75f0f836012c64478c58a00d'
+RELEASE_035_PARENT = '6b898759aeab14265d366e221847a8b3b1963f20'
 EMAIL_DIGEST = '0fafc21188c42cb180d371c2ee6f25bb3b28bfdf133dfd2f4a91b18d477386d6'
 
 def release_email(value):
@@ -23,12 +24,12 @@ def release_email(value):
 
 def commit_metadata(sha, approved_sha):
     raw = git('cat-file', 'commit', sha)
-    if sha != approved_sha:
+    if sha != RELEASE_035 and sha != approved_sha:
         return raw
     headers, separator, message = raw.partition(b'\n\n')
     lines = headers.split(b'\n')
-    if [line[7:] for line in lines if line.startswith(b'parent ')] != [RELEASE_PARENT.encode()]:
-        raise ValueError('Identity approval requires the single v0.3.4 parent')
+    if [line[7:] for line in lines if line.startswith(b'parent ')] != [(RELEASE_035_PARENT if sha == RELEASE_035 else RELEASE_035).encode()]:
+        raise ValueError('Unexpected release parent for identity approval')
     for field in (b'author', b'committer'):
         indices = [i for i, line in enumerate(lines) if line.startswith(field + b' ')]
         if len(indices) != 1:
@@ -80,7 +81,7 @@ def check(name, data):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--identity-commit', help='Exact full SHA approved for the v0.3.5 release identity')
+    parser.add_argument('--identity-commit', help='Exact full SHA approved for the v0.3.6 release identity')
     approved = parser.parse_args().identity_commit
     if approved and not re.fullmatch('[0-9a-f]{40}', approved):
         parser.error('Expected a full lowercase SHA')

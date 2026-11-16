@@ -52,6 +52,14 @@ class CrmWriter
             }
         }
         foreach (['client_id' => Client::class, 'deal_id' => Deal::class, 'order_id' => Order::class] as $key => $related) {
+            if ($key === 'client_id' && in_array($model, [Deal::class, Order::class], true)) {
+                // Updated sales are checked against the locked, current record below.
+                if (! $record) {
+                    abort_unless(ClientDirectory::forSale(null)->whereKey($data[$key])->exists(), 403);
+                }
+
+                continue;
+            }
             if (! empty($data[$key])) {
                 abort_unless(CrmAccess::query($related)->whereKey($data[$key])->exists(), 403);
             }
@@ -86,16 +94,18 @@ class CrmWriter
                     throw ValidationException::withMessages(['data.items' => 'Сумма заказа слишком велика.']);
                 }
             }
+            if ($record && in_array($model, [Order::class, Deal::class], true)) {
+                $record = $model::query()->lockForUpdate()->findOrFail($record->id);
+                Gate::authorize('update', $record);
+                abort_unless(ClientDirectory::forSale($record)->whereKey($data['client_id'])->exists(), 403);
+            }
             if ($model === Order::class && $record) {
-                $record = Order::query()->lockForUpdate()->findOrFail($record->id);
                 if (($record->payments()->exists() || $record->cashReceipts()->exists()) && ($data['currency'] !== $record->currency || $data['client_id'] != $record->client_id)) {
                     throw ValidationException::withMessages(['data.currency' => 'После оплаты нельзя менять валюту и клиента заказа.']);
                 }
             }
             if ($model === Deal::class) {
                 if ($record) {
-                    $record = Deal::query()->lockForUpdate()->findOrFail($record->id);
-                    Gate::authorize('update', $record);
                     DealStages::validateTransition($record, $data['status']);
                 }
                 $data['items'] = $items;

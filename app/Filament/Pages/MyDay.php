@@ -11,6 +11,7 @@ use App\Models\Deal;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Task;
+use App\Services\ClientDirectory;
 use App\Services\CrmAccess;
 use App\Services\CrmWriter;
 use Filament\Pages\Page;
@@ -59,7 +60,7 @@ class MyDay extends Page
         $orders = CrmAccess::query(Order::class)->where('manager_id', auth()->id())
             ->whereNotIn('status', ['delivered', 'cancelled'])->select(['id', 'status', 'due_at'])
             ->addSelect([
-                'client_name' => CrmAccess::query(Client::class)->select('name')->whereColumn('clients.id', 'orders.client_id'),
+                'client_name' => ClientDirectory::visible()->select('name')->whereColumn('clients.id', 'orders.client_id'),
                 'product' => OrderItem::select('name')->whereColumn('order_id', 'orders.id')->orderBy('id')->limit(1),
             ])->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderBy('id')->limit(8)->get();
         $deals = null;
@@ -67,7 +68,7 @@ class MyDay extends Page
             $action = (clone $tasks)->whereColumn('tasks.deal_id', 'deals.id')->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderBy('id')->limit(1);
             $deals = CrmAccess::query(Deal::class)->whereIn('id', (clone $tasks)->select('deal_id'))
                 ->select(['id', 'title', 'status'])->addSelect([
-                    'client_name' => CrmAccess::query(Client::class)->select('name')->whereColumn('clients.id', 'deals.client_id'),
+                    'client_name' => ClientDirectory::visible()->select('name')->whereColumn('clients.id', 'deals.client_id'),
                     'action_title' => (clone $action)->select('title'),
                     'action_due' => (clone $action)->select('due_at'),
                 ])->orderByRaw('action_due IS NULL')->orderBy('action_due')->orderBy('id')->limit(8)->get();

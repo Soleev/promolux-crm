@@ -2,8 +2,8 @@
 
 namespace App\Filament;
 
-use App\Models\Client;
 use App\Models\Order;
+use App\Services\ClientDirectory;
 use App\Services\CrmAccess;
 use App\Services\Money;
 use Filament\Forms\Components\Select;
@@ -26,7 +26,7 @@ class OrderSelect
     private static function query(): Builder
     {
         return CrmAccess::query(Order::class)->with([
-            'client' => fn ($q) => $q->whereIn('id', CrmAccess::query(Client::class)->select('id')),
+            'client' => fn ($q) => $q->whereIn('id', ClientDirectory::visible()->select('id')),
             'items' => fn ($q) => $q->orderBy('id'),
         ]);
     }
@@ -40,7 +40,7 @@ class OrderSelect
                 $like = '%'.$term.'%';
                 $q->whereLike('number', $like)
                     ->orWhereHas('client', fn ($client) => $client
-                        ->whereIn('id', CrmAccess::query(Client::class)->select('id'))->whereLike('name', $like))
+                        ->whereIn('id', ClientDirectory::visible()->select('id'))->whereLike('name', $like))
                     ->orWhereHas('items', fn ($items) => $items->whereLike('name', $like));
 
                 if (preg_match('/^№?\s*(\d+)$/u', $term, $matches)) {

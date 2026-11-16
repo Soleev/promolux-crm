@@ -11,6 +11,7 @@ use App\Models\Payment;
 use App\Models\Payout;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\ClientDirectory;
 use App\Services\CrmAccess;
 use App\Services\DealStages;
 use App\Services\Money;
@@ -48,6 +49,16 @@ class CrmForms
         return Select::make($field)->label($label)->options(fn () => CrmAccess::query($model)->orderByDesc('id')->limit(500)->pluck($title, 'id'))->searchable()->required($required);
     }
 
+    public static function saleClient(): Select
+    {
+        return Select::make('client_id')->label('Клиент')->required()->searchable()
+            ->options(fn (?Model $record) => ClientDirectory::forSale($record)->orderBy('name')->limit(50)->pluck('name','id'))
+            ->getSearchResultsUsing(fn (string $search, ?Model $record) => ClientDirectory::forSale($record)
+                ->where(fn ($q) => $q->whereLike('name','%'.$search.'%')->orWhereLike('phone','%'.$search.'%')->orWhereLike('email','%'.$search.'%'))
+                ->orderBy('name')->limit(50)->pluck('name','id')->all())
+            ->getOptionLabelUsing(fn ($value, ?Model $record) => ClientDirectory::forSale($record)->whereKey($value)->value('name'));
+    }
+
     public static function items(): Repeater
     {
         return Repeater::make('items')->label('Позиции')->schema([
@@ -68,13 +79,15 @@ class CrmForms
 
         return match ($model) {
             Client::class => [
-                TextInput::make('name')->label('Компания / клиент')->required()->maxLength(255), self::manager(),
-                TextInput::make('phone')->label('Телефон')->maxLength(100), TextInput::make('email')->label('Email')->email(),
+                TextInput::make('name')->label('Компания / клиент')->live(onBlur: true)->required()->maxLength(255), self::manager(),
+                TextInput::make('phone')->label('Телефон')->live(onBlur: true)->maxLength(100), TextInput::make('email')->label('Email')->live(onBlur: true)->email(),
+                \Filament\Schemas\Components\View::make('filament.client-matches')->visible(fn (?Model $record) => ! $record)
+                    ->columnSpanFull()->viewData(fn (Get $get) => ['matches'=>ClientDirectory::matches($get('name'),$get('phone'),$get('email'))]),
                 TextInput::make('source')->label('Источник обращения')->maxLength(255),
                 Repeater::make('contacts')->label('Контактные лица')->schema([TextInput::make('name')->label('Имя')->required(), TextInput::make('phone')->label('Телефон'), TextInput::make('email')->label('Email')->email()])->columns(3)->defaultItems(0)->columnSpanFull(), $notes(),
             ],
             Deal::class => [
-                TextInput::make('title')->label('Название сделки')->required(), self::relation('client_id', Client::class, 'Клиент', 'name', true), self::manager(),
+                TextInput::make('title')->label('Название сделки')->required(), self::saleClient(), self::manager(),
                 Select::make('status')->label('Этап')->options(fn (?Deal $record) => $record
                     ? array_intersect_key(self::dealStatuses(), array_flip([$record->status, ...DealStages::targets($record)]))
                     : self::dealStatuses())->default('new')->required()->live()
@@ -84,7 +97,7 @@ class CrmForms
             ],
             Order::class => [
                 TextInput::make('number')->label('Номер заказа')->default(fn () => 'PL-'.strtoupper((string) Str::ulid()))->required(),
-                self::relation('client_id', Client::class, 'Клиент', 'name', true), self::manager(),
+                self::saleClient(), self::manager(),
                 Select::make('status')->label('Производственный статус')->options(self::orderStatuses())->default('new')->required(),
                 DatePicker::make('due_at')->native(false)->displayFormat('d.m.Y')->label('Срок'), Textarea::make('description')->label('Описание'), self::upload('attachment'), self::items(),
             ],

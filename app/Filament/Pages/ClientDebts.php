@@ -4,10 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Filament\CrmForms;
 use App\Filament\Resources\Orders\OrderResource;
-use App\Models\Client;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
+use App\Services\ClientDirectory;
 use App\Services\CrmAccess;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -46,7 +46,7 @@ class ClientDebts extends Page implements HasTable
     {
         abort_unless(static::canAccess(), 403);
         $totals = CrmAccess::query(Order::class)->withPaymentTotals()->addSelect([
-            'client_name' => CrmAccess::query(Client::class)->select('name')->whereColumn('clients.id', 'orders.client_id'),
+            'client_name' => ClientDirectory::visible()->select('name')->whereColumn('clients.id', 'orders.client_id'),
             'product' => OrderItem::select('name')->whereColumn('order_id', 'orders.id')->orderBy('id')->limit(1),
         ]);
         // Cast before subtraction: MariaDB may return unsigned amounts and an overpayment is valid.

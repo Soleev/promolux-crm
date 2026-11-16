@@ -234,11 +234,11 @@ it('records a transfer immediately and cancels a pending cash entry without post
 it('lets the owner browse the selected employee and return without granting write access', function () {
     [$owner,,$manager,$order] = crmScenario();
     $other = User::factory()->create(['active' => true, 'role' => 'manager']);
-    $otherClient = Client::create(['name' => 'Другой клиент', 'manager_id' => $other->id]);
+    $otherClient = Client::create(['name' => 'Другой клиент', 'manager_id' => $other->id, 'notes'=>'Закрытая заметка другого сотрудника']);
 
     $this->get('/crm/overview')->assertOk()->assertSee('Просмотр роли');
     $this->post('/crm/preview-role', ['view_as' => 'user:'.$manager->id])->assertRedirect('/crm');
-    $this->get('/crm/clients')->assertOk()->assertSee('Вернуться к владельцу')->assertSee($order->client->name)->assertDontSee($otherClient->name);
+    $this->get('/crm/clients')->assertOk()->assertSee('Вернуться к владельцу')->assertSee($order->client->name)->assertSee($otherClient->name)->assertDontSee($otherClient->notes);
     $this->get('/crm/expenses')->assertForbidden();
     $this->post('/crm/preview-role', ['view_as' => 'cashier'])->assertForbidden();
     $this->post('/crm/exit-preview')->assertRedirect('/crm');

@@ -37,7 +37,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('crm')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName('Promolux')
-            ->navigationGroups(['Главная', 'Продажи', 'Финансы', 'Управление', 'Справка'])
+            ->navigationGroups(['Главная', 'Продажи', 'Каталог', 'Финансы', 'Управление', 'Справка'])
             ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_BEFORE, fn () => view('filament.header-status'))
             ->userMenuItems([
                 Action::make('about')->label('О программе')->icon('heroicon-o-information-circle')->url(fn () => About::getUrl()),

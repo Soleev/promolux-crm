@@ -67,8 +67,21 @@ class RecordDetails
             $attributes['active'] = $record->active ? 'Разрешён' : 'Отключён';
         }
         $details = ['fields' => $attributes, 'items' => [], 'related' => [], 'history' => [], 'accruals' => [], 'allocations' => []];
+        if ($record instanceof Deal || $record instanceof Order) {
+            $rows = $record instanceof Deal ? ($record->items ?? []) : $record->items->toArray();
+            $display = fn (int $minor) => $record->currency === 'UZS' ? Money::display($minor) : Money::format($minor).' '.$record->currency;
+            foreach ($rows as $row) {
+                $snapshot = $row['catalog_snapshot'] ?? [];
+                $details['items'][] = [
+                    'name' => $row['name'], 'quantity' => $snapshot['area'] ?? $row['quantity'],
+                    'unit' => $snapshot['unit'] ?? '', 'supplier' => $snapshot['supplier'] ?? null,
+                    'price' => $display($snapshot['rate_minor'] ?? $row['price_minor']),
+                    'total' => $display($row['quantity'] * $row['price_minor']),
+                    'snapshot' => $snapshot,
+                ];
+            }
+        }
         if ($record instanceof Order) {
-            $details['items'] = $record->items->map(fn ($i) => ['name' => $i->name, 'quantity' => $i->quantity, 'price' => $record->displayAmount($i->price_minor), 'total' => $record->displayAmount($i->price_minor * $i->quantity)])->all();
             $details['balanceOrder'] = CrmAccess::query(Order::class)->withPaymentTotals()->findOrFail($record->id);
             $details['payments'] = CrmAccess::query(Payment::class)->where('order_id', $record->id)->where('currency', $record->currency)->latest('paid_at')->latest('id')->get();
             $details['pendingCash'] = CashReceiptResource::getEloquentQuery()->withoutEagerLoads()->where('order_id', $record->id)->where('status', 'pending')->latest('collected_at')->get();

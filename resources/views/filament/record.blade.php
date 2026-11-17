@@ -22,8 +22,17 @@
         <x-filament::button tag="a" :href="route('crm.document',['type'=>'payment','id'=>$record->id])">Скачать подтверждение оплаты</x-filament::button>
     @endif
     @if(count($details['items']))
-        <h3 class="font-semibold">Позиции заказа</h3>
-        @foreach($details['items'] as $item)<p class="text-sm">{{ $item['name'] }} · {{ $item['quantity'] }} × {{ $item['price'] }} = {{ $item['total'] }}</p>@endforeach
+        <h3 class="font-semibold">Позиции</h3>
+        @foreach($details['items'] as $item)
+            <div class="text-sm">
+                <p>{{ $item['name'] }} · {{ $item['quantity'] }} {{ $item['unit'] }} × {{ $item['price'] }} = {{ $item['total'] }}</p>
+                @if($item['supplier'])<p>Исполнитель · {{ $item['supplier'] }}</p>@endif
+                @if(isset($item['snapshot']['area']))<p>{{ $item['snapshot']['width'] }} × {{ $item['snapshot']['height'] }} м · {{ $item['snapshot']['copies'] }} экз.</p>@endif
+                @foreach($item['snapshot']['characteristics'] ?? [] as $index => $value)
+                    @if(filled($value))<p>{{ $item['snapshot']['fields'][$index] }} · {{ $value }}</p>@endif
+                @endforeach
+            </div>
+        @endforeach
     @endif
     @if(isset($details['balanceOrder']))
         <section id="order-payments-{{ $record->id }}">

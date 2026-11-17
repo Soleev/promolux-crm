@@ -36,7 +36,15 @@ class CrmWriter
             default => abort(403),
         };
         if (in_array($model, [Order::class, Deal::class])) {
-            $rules += ['items' => 'required|array|min:1', 'items.*.name' => 'required|string|max:255', 'items.*.quantity' => 'required|integer|min:1|max:1000000', 'items.*.price' => 'required|string'];
+            $rules += ['items' => 'required|array|min:1', 'items.*.name' => 'required_without:items.*.product_id|nullable|string|max:255', 'items.*.quantity' => 'required|integer|min:1|max:1000000', 'items.*.price' => 'required|string',
+                'items.*.product_id' => 'nullable|integer|min:1', 'items.*.supplier_id' => 'nullable|integer|min:1',
+                'items.*.line_key' => 'nullable|uuid', 'items.*.characteristics' => 'nullable|array|max:40',
+                'items.*.characteristics.*' => 'nullable|string|max:2000',
+                'items.*.width' => 'nullable|string|max:8', 'items.*.height' => 'nullable|string|max:8'];
+        }
+        if (isset($rules['items'], $input['items']) && is_array($input['items'])) {
+            // Optional fields may be validated in a different order across mixed lines.
+            $input['items'] = array_values($input['items']);
         }
         if ($user->handlesOwnOrders()) {
             $input['manager_id'] = $user->id;
@@ -81,23 +89,14 @@ class CrmWriter
         return DB::transaction(function () use ($model, $record, $data) {
             $items = $data['items'] ?? null;
             unset($data['items']);
-            if ($items !== null) {
-                $items = array_map(function ($item) {
-                    $price = Money::parse($item['price']);
-                    if ($price > 100000000000) {
-                        throw ValidationException::withMessages(['data.items' => 'Цена позиции слишком велика.']);
-                    }
-
-                    return ['name' => $item['name'], 'quantity' => (int) $item['quantity'], 'price_minor' => $price];
-                }, $items);
-                if (array_sum(array_map(fn ($i) => $i['quantity'] * $i['price_minor'], $items)) > 99999999999999) {
-                    throw ValidationException::withMessages(['data.items' => 'Сумма заказа слишком велика.']);
-                }
-            }
             if ($record && in_array($model, [Order::class, Deal::class], true)) {
                 $record = $model::query()->lockForUpdate()->findOrFail($record->id);
                 Gate::authorize('update', $record);
                 abort_unless(ClientDirectory::forSale($record)->whereKey($data['client_id'])->exists(), 403);
+            }
+            if ($items !== null) {
+                ksort($items, SORT_NUMERIC);
+                $items = CatalogLines::normalize($items, $record);
             }
             if ($model === Order::class && $record) {
                 if (($record->payments()->exists() || $record->cashReceipts()->exists()) && ($data['currency'] !== $record->currency || $data['client_id'] != $record->client_id)) {

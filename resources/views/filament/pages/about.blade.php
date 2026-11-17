@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     @php
         $version = config('app.version');
-        $releases = config('releases', []);
+        $releases = array_filter(config('releases', []), fn ($entry) => version_compare($entry, $version, '<='), ARRAY_FILTER_USE_KEY);
         $current = $releases[$version] ?? null;
     @endphp
     <x-filament::section heading="Promolux CRM">

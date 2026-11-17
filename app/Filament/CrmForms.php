@@ -61,11 +61,7 @@ class CrmForms
 
     public static function items(): Repeater
     {
-        return Repeater::make('items')->label('Позиции')->schema([
-            TextInput::make('name')->label('Наименование')->required()->maxLength(255),
-            TextInput::make('quantity')->label('Количество')->integer()->minValue(1)->maxValue(1000000)->default(1)->required(),
-            self::money('price', 'Цена за единицу'),
-        ])->columns(3)->minItems(1)->defaultItems(1)->columnSpanFull();
+        return CatalogItemForm::make();
     }
 
     public static function upload(string $name): FileUpload
@@ -167,10 +163,10 @@ class CrmForms
     {
         unset($data['password']);
         if ($record instanceof Order) {
-            $data['items'] = $record->items->map(fn ($i) => ['name' => $i->name, 'quantity' => $i->quantity, 'price' => Money::format($i->price_minor)])->all();
+            $data['items'] = $record->items->map(fn ($item) => \App\Services\CatalogLines::edit($item->toArray()))->all();
         }
         if ($record instanceof Deal) {
-            $data['items'] = array_map(fn ($i) => ['name' => $i['name'], 'quantity' => $i['quantity'], 'price' => Money::format($i['price_minor'])], $record->items ?? []);
+            $data['items'] = array_map(\App\Services\CatalogLines::edit(...), $record->items ?? []);
         }
 
         return $data;

@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\LocalAvatar;
 use App\Filament\Pages\About;
 use App\Filament\Pages\Help;
 use App\Filament\Pages\Overview;
@@ -14,6 +15,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -37,6 +39,10 @@ class AdminPanelProvider extends PanelProvider
             ->path('crm')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName('Promolux')
+            ->defaultAvatarProvider(LocalAvatar::class)
+            ->sidebarWidth('16rem')
+            ->sidebarCollapsibleOnDesktop()
+            ->maxContentWidth(Width::Full)
             ->navigationGroups(['Главная', 'Продажи', 'Каталог', 'Финансы', 'Управление', 'Справка'])
             ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_BEFORE, fn () => view('filament.header-status'))
             ->userMenuItems([

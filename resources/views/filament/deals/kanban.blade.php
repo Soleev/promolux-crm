@@ -53,9 +53,9 @@
                                 <p class="text-xs text-gray-500">Заказ уже создан. Этап зафиксирован.</p>
                             @endif
                             <div class="flex flex-wrap gap-3">
-                                @foreach (['details', 'edit', 'changeStage', 'convert', 'openOrder'] as $name)
-                                    @php $action = (clone $this->getTable()->getAction($name))->record($deal); @endphp
-                                    @if ($action->isVisible() && $action->isAuthorized())
+                                @foreach ($this->getTable()->getRecordActions() as $recordAction)
+                                    @php $action = $recordAction->getClone()->record($deal); @endphp
+                                    @if ($action->isVisible())
                                         {{ $action }}
                                     @endif
                                 @endforeach

@@ -50,7 +50,7 @@ class ActivityHistory
         Expense::class => ExpenseResource::class, Payout::class => PayoutResource::class, Accrual::class => AccrualResource::class,
     ];
 
-    private const REFERENCES = ['manager_id' => User::class, 'client_id' => Client::class, 'order_id' => Order::class, 'deal_id' => Deal::class, 'payout_id' => Payout::class];
+    private const REFERENCES = ['created_by' => User::class, 'manager_id' => User::class, 'client_id' => Client::class, 'order_id' => Order::class, 'deal_id' => Deal::class, 'payout_id' => Payout::class];
 
     public static function forRecord(Model $record): array
     {
@@ -195,7 +195,7 @@ class ActivityHistory
             Client::class => ['name' => 'Название клиента', 'phone' => 'Телефон', 'email' => 'Электронная почта', 'contacts' => 'Контактные лица', 'notes' => 'Примечание', 'message' => 'Заметка', 'source' => 'Источник'] + $manager,
             Deal::class => ['title' => 'Название сделки', 'status' => 'Этап сделки', 'lost_reason' => 'Причина отказа', 'description' => 'Описание', 'items' => 'Позиции'] + $manager + $customer + ['order_id' => 'Заказ'],
             Order::class => $production + $manager + $customer + ['description' => 'Описание', 'deal_id' => 'Сделка'],
-            Task::class => ['title' => 'Название задачи', 'status' => 'Статус задачи', 'due_at' => 'Срок выполнения', 'notes' => 'Примечание'] + $manager + $customer + $related,
+            Task::class => ['created_by' => 'Постановщик', 'manager_id' => 'Исполнитель', 'title' => 'Название задачи', 'status' => 'Статус задачи', 'due_at' => 'Срок выполнения', 'notes' => 'Примечание'] + $manager + $customer + $related,
             OrderItem::class => ['name' => 'Продукция', 'quantity' => 'Количество', 'price_minor' => 'Цена', 'order_id' => 'Заказ'],
             CashReceipt::class => ['amount_minor' => 'Сумма', 'status' => 'Состояние наличных', 'collected_at' => 'Получено от клиента', 'handed_at' => 'Принято кассиром', 'reason' => 'Причина', 'order_id' => 'Заказ'],
             Payment::class => $money + ['notes' => 'Примечание', 'method' => 'Способ оплаты', 'order_id' => 'Заказ'],

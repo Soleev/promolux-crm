@@ -42,6 +42,7 @@ abstract class CatalogResource extends Resource
     public static function canViewAny(): bool
     {
         $user = auth()->user();
+
         return $user?->active && (in_array($user->role, ['owner', 'rop'], true) ||
             ($user->role === 'manager' && in_array(static::$model, [CatalogCategory::class, CatalogProduct::class], true)))
             && DatabaseSchema::hasTable('catalog_products');
@@ -50,6 +51,7 @@ abstract class CatalogResource extends Resource
     private static function writable(): bool
     {
         $user = auth()->user();
+
         return $user?->active && ! request()->attributes->get('preview_applied') &&
             ($user->role === 'owner' || ($user->role === 'rop' && in_array(static::$model, [CatalogCategory::class, CatalogProduct::class, CatalogSupplier::class], true)));
     }
@@ -63,6 +65,7 @@ abstract class CatalogResource extends Resource
         if (auth()->user()->role === 'manager') {
             return static::$model === CatalogProduct::class ? $query->available() : $query->where('active', true);
         }
+
         return $query;
     }
 
@@ -99,6 +102,7 @@ abstract class CatalogResource extends Resource
                     while ($value) {
                         if (in_array((int) $value, $seen, true)) {
                             $fail('Категории не могут образовывать цикл.');
+
                             return;
                         }
                         $seen[] = (int) $value;
@@ -110,6 +114,7 @@ abstract class CatalogResource extends Resource
             $fields[] = Toggle::make('active')->label('Активно')->live()->default(static::$model === CatalogCategory::class);
             $fields[] = TextInput::make('sort')->label('Сортировка')->integer()->minValue(0)->maxValue(1000000)->default(0)->required();
         }
+
         return $schema->components($fields)->columns(2);
     }
 
@@ -138,7 +143,8 @@ abstract class CatalogResource extends Resource
             $filters[] = SelectFilter::make('active')->label('Статус')->options([1 => 'Активно', 0 => 'Черновик']);
             $table->defaultSort('sort');
         }
-        return $table->columns($columns)->filters($filters)
+
+        return $table->columns($columns)->filters($filters)->stackedOnMobile()
             ->headerActions([CreateAction::make()->authorize(fn () => static::writable())])
             ->recordActions([ViewAction::make()->authorize(fn () => static::canViewAny()),
                 EditAction::make()->authorize(fn () => static::writable())]);

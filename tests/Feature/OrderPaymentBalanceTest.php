@@ -23,6 +23,9 @@ it('shows the outstanding balance through partial payments, settlement, overpaym
         expect($row->paid_minor)->toBe($paid)->and($row->payment_status)->toBe($status);
         $this->view('filament.order-payment', ['order' => $row])
             ->assertSee($percent)->assertSeeInOrder(['Осталось получить', $outstanding]);
+        $this->view('filament.order-payment-compact', ['order' => $row])
+            ->assertSee($percent)->assertSee($status)->assertSee($row->displayAmount($paid))
+            ->assertSee($row->displayAmount(abs($row->total_minor - $paid)));
     };
     $assertBalance(0, '0,0%', '10 000 000 сум', 'Не оплачен');
     $first = array_replace($input, ['amount' => '1234567.89']);
@@ -85,6 +88,7 @@ it('loads empty orders and payment indicators without additional queries per row
             $component = $this->view('filament.order-payment', ['order' => $row]);
             if ($row->is($empty)) {
                 $component->assertSee('Оплачено: —')->assertDontSee('<progress', false);
+                $this->view('filament.order-payment-compact', ['order' => $row])->assertSee('—')->assertDontSee('<progress', false);
             }
         }
         expect(DB::getQueryLog())->toBeEmpty();
@@ -141,4 +145,12 @@ it('keeps order balances attached to their rows through sorting, search, filters
         ->assertCanSeeTableRecords([$other])->assertCanNotSeeTableRecords([$first])->assertDontSee('100,0%');
     $page->searchTable($first->number)->assertCanSeeTableRecords([$first])->assertSee('100,0%')
         ->filterTable('status', 'production')->assertCanNotSeeTableRecords([$first]);
+});
+
+it('formats a historical foreign-currency order consistently in both payment views', function () {
+    [, , , $order] = crmScenario('EUR');
+    $row = OrderResource::getEloquentQuery()->findOrFail($order->id);
+    foreach (['filament.order-payment', 'filament.order-payment-compact'] as $view) {
+        $this->view($view, ['order' => $row])->assertSee('10000000.00 EUR')->assertDontSee('сум');
+    }
 });

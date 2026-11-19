@@ -8,6 +8,8 @@ class ProductResource extends CatalogResource
 {
     protected static ?string $model = CatalogProduct::class;
 
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cube';
+
     protected static ?string $modelLabel = 'Продукция или услуга';
 
     protected static ?string $pluralModelLabel = 'Продукция и услуги';

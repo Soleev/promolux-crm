@@ -3,6 +3,7 @@
 use App\Filament\CrmForms;
 use App\Filament\Resources\Catalog\Pages\ManageProduct;
 use App\Filament\Resources\Orders\Pages\ManageOrders;
+use App\Models\Accrual;
 use App\Models\CatalogCategory;
 use App\Models\CatalogProduct;
 use App\Models\CatalogSupplier;
@@ -11,8 +12,10 @@ use App\Models\Deal;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\CrmWriter;
+use App\Services\Ledger;
 use Database\Seeders\CatalogSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
@@ -33,6 +36,7 @@ beforeEach(function () {
 });
 
 it('seeds the exact assortment and preserves commercial overrides on rerun', function () {
+    expect(CatalogProduct::all()->contains(fn ($p) => in_array('Тираж', $p->fields ?? [], true)))->toBeFalse();
     expect(CatalogCategory::count())->toBe(13)->and(CatalogProduct::count())->toBe(80)
         ->and(CatalogProduct::available()->count())->toBe(15)->and(CatalogSupplier::count())->toBe(2);
     $this->banner->update(['name' => 'Согласованное имя', 'reference_minor' => 124, 'active' => false]);
@@ -116,14 +120,14 @@ it('keeps historical integer prices, payments and commissions when editing a pai
     $this->sale['items'] = [['name' => 'Тираж v0.3.7', 'quantity' => 150, 'price' => '123.45']];
     $order = $this->writer->save(Order::class, $this->sale);
     $this->actingAs($owner);
-    $payment = app(\App\Services\Ledger::class)->payment(['order_id' => $order->id, 'owner_id' => $owner->id, 'rop_id' => $rop->id,
-        'amount' => '9000', 'paid_at' => today()->toDateString(), 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()]);
-    $before = \App\Models\Accrual::orderBy('id')->get()->toArray();
+    $payment = app(Ledger::class)->payment(['order_id' => $order->id, 'owner_id' => $owner->id, 'rop_id' => $rop->id,
+        'amount' => '9000', 'paid_at' => today()->toDateString(), 'idempotency_key' => (string) Str::uuid()]);
+    $before = Accrual::orderBy('id')->get()->toArray();
     $original = $payment->fresh()->getRawOriginal();
     $data = CrmForms::editData($order->toArray(), $order);
     $this->writer->save(Order::class, $data, $order);
     expect($order->fresh()->total_minor)->toBe(1851750)
         ->and($order->fresh()->items->sole()->catalog_snapshot)->toBeNull()
         ->and($payment->fresh()->getRawOriginal())->toBe($original)
-        ->and(\App\Models\Accrual::orderBy('id')->get()->toArray())->toBe($before);
+        ->and(Accrual::orderBy('id')->get()->toArray())->toBe($before);
 });

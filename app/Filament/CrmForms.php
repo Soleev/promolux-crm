@@ -99,9 +99,9 @@ class CrmForms
             ],
             Task::class => [
                 TextInput::make('title')->label('Задача')->required(),
-                Select::make('manager_id')->label('Ответственный')->options(fn () => User::where('active', true)->when(auth()->user()->handlesOwnOrders(), fn ($q) => $q->whereKey(auth()->id()))->pluck('name', 'id'))->default(fn () => auth()->id())->required(),
+                Select::make('manager_id')->label('Ответственный')->options(fn () => CrmAccess::taskAssignees(auth()->user())->orderBy('name')->pluck('name', 'id'))->default(fn () => auth()->id())->required(),
                 DateTimePicker::make('due_at')->native(false)->displayFormat('d.m.Y H:i')->label('Срок')->seconds(false)->required(),
-                Select::make('status')->label('Статус')->options(self::taskStatuses())->default('open')->required(),
+                self::taskStatusField(),
                 self::relation('client_id', Client::class, 'Клиент'), self::relation('deal_id', Deal::class, 'Сделка', 'title'), OrderSelect::make(), $notes(),
             ],
             Payment::class => [
@@ -149,6 +149,11 @@ class CrmForms
         return ['new' => 'Новый', 'design' => 'Макет', 'production' => 'Производство', 'ready' => 'Готов', 'delivered' => 'Передан', 'cancelled' => 'Отменён'];
     }
 
+    public static function taskStatusField(): Select
+    {
+        return Select::make('status')->label('Статус')->options(self::taskStatuses())->default('open')->required();
+    }
+
     public static function taskStatuses(): array
     {
         return ['open' => 'Открыта', 'in_progress' => 'В работе', 'done' => 'Выполнена', 'cancelled' => 'Отменена'];
@@ -162,6 +167,16 @@ class CrmForms
     public static function editData(array $data, Model $record): array
     {
         unset($data['password']);
+        if ($record instanceof Task) {
+            if ($record->statusOnlyFor(auth()->user())) {
+                return ['status' => $record->status];
+            }
+            foreach (['client_id' => Client::class, 'deal_id' => Deal::class, 'order_id' => Order::class] as $field => $model) {
+                if ($record->$field && ! CrmAccess::query($model)->whereKey($record->$field)->exists()) {
+                    unset($data[$field]);
+                }
+            }
+        }
         if ($record instanceof Order) {
             $data['items'] = $record->items->map(fn ($item) => \App\Services\CatalogLines::edit($item->toArray()))->all();
         }

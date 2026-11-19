@@ -40,7 +40,7 @@ class MyDay extends Page
         DB::transaction(function () use ($id) {
             $task = CrmAccess::query(Task::class)->where('manager_id', auth()->id())->lockForUpdate()->findOrFail($id);
             if (! in_array($task->status, ['done', 'cancelled'], true)) {
-                app(CrmWriter::class)->save(Task::class, array_merge($task->getAttributes(), ['status' => 'done']), $task);
+                app(CrmWriter::class)->save(Task::class, ['status' => 'done'], $task);
             }
         });
     }
@@ -77,6 +77,13 @@ class MyDay extends Page
         return [
             'today' => (clone $rows)->whereBetween('due_at', [$now->copy()->startOfDay(), $now->copy()->endOfDay()])->get(),
             'late' => (clone $rows)->where('due_at', '<', $now)->get(),
+            'delegated' => auth()->user()->role === 'manager' && Task::supportsDelegation()
+                ? CrmAccess::query(Task::class)->where('created_by', auth()->id())->where('manager_id', '!=', auth()->id())
+                    ->with('manager:id,name')->latest('updated_at')->orderByDesc('id')->limit(8)->get()
+                : null,
+            'upcoming' => auth()->user()->role === 'designer'
+                ? (clone $rows)->where('due_at', '>', $now->copy()->endOfDay())->get()
+                : null,
             'orders' => $orders, 'deals' => $deals,
             'resources' => array_filter(['задачу' => TaskResource::class, 'клиента' => ClientResource::class, 'сделку' => DealResource::class, 'заказ' => OrderResource::class], fn ($resource) => $resource::canViewAny()),
         ];

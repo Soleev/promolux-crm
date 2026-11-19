@@ -1,0 +1,5 @@
+{
+    "filament-panels::layout.skip_to_content.label": "Перейти к содержимому",
+    "filament-tables::table.loading": "Загрузка…",
+    "filament-tables::table.result_count": "Найдено записей: :count"
+}

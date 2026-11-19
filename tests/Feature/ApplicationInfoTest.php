@@ -39,3 +39,10 @@ it('uses the configured release on every page without inventing a release date',
     $this->get('/crm/orders')->assertOk()->assertSee('v0.99.0');
     $this->get('/crm/about')->assertOk()->assertSee('v0.99.0')->assertSee('Не указана');
 });
+
+it('shows the confirmed date of v0.3.8 without exposing configuration', function () {
+    $this->travelTo(CarbonImmutable::parse('2027-01-09 10:00:00', 'Asia/Tashkent'));
+    config(['app.version' => '0.3.8']);
+    $this->actingAs(User::factory()->create(['role' => 'owner', 'active' => true]));
+    $this->get('/crm/about')->assertOk()->assertSee('17.11.2026')->assertDontSee('Не указана');
+});

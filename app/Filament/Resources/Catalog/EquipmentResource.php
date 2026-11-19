@@ -8,6 +8,8 @@ class EquipmentResource extends CatalogResource
 {
     protected static ?string $model = CatalogEquipment::class;
 
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-wrench-screwdriver';
+
     protected static ?string $modelLabel = 'Оборудование';
 
     protected static ?string $pluralModelLabel = 'Оборудование';

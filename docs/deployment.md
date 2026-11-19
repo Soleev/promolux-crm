@@ -117,3 +117,76 @@ Laravel получает base URL через SCRIPT_NAME=/promolux/index.php; н
 500 MB — общая квота, которая может включать БД, почту, Git, несколько vendor, временный Composer cache, логи и backups. Не начинать deploy, если места не хватает на текущий + новый + предыдущий выпуск и запас. Рекомендуется минимум 1 GB, лучше 2 GB при вложениях и локальных backup; измерять фактическую квоту перед каждым выпуском. Ограничения конкретного тарифа пока не проверены.
 
 Источники: [cPanel manual deployment](https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/), [Livewire 4 installation](https://livewire.laravel.com/docs/4.x/installation), [Laravel deployment](https://laravel.com/docs/13.x/deployment), [Laravel database](https://laravel.com/docs/13.x/database).
+
+
+## Переход 0.3.8 → 0.3.9 (кандидат, не разрешение на выполнение)
+
+До запуска оператор обязан подтвердить восстановление backup на отдельной базе,
+полный SHA текущего выпуска и утверждённый SHA кандидата. Никаких seed-команд.
+Новая миграция 2026_11_17_010000_add_creator_to_tasks добавляет nullable created_by,
+внешний ключ users и индекс; старые задачи не заполняются выдуманным автором.
+Откат кода оставляет добавочную схему; migrate:rollback запрещён.
+
+В закрытый deploy.local.env кроме путей PHP/Composer добавить:
+```bash
+EXPECTED_CURRENT_SHA='<проверенный полный SHA действующего 0.3.8>'
+EXPECTED_CURRENT_VERSION='0.3.8'
+TARGET_VERSION='0.3.9'
+```
+После отдельного разрешения публикации и переноса:
+```bash
+cd ~/repositories/promolux-crm
+# Checkout только утверждённого полного SHA; не автоматически latest/main.
+git checkout --detach '<утверждённый SHA>'
+printf '%s\n' '<утверждённый SHA>' > ~/promolux/approved-commit
+bash tools/deploy-cpanel.sh prepare
+```
+Prepare не переключает current. Проверить квоту байтов и inodes в cPanel,
+`df -Pk ~/promolux`, `df -Pi ~/promolux`, `du -sk ~/promolux/releases/*`.
+Сохранить текущий и предыдущий выпуск; запас должен включать новый vendor,
+Composer cache, архив БД и storage. Фиксированный порог скрипта — лишь нижний предел.
+
+Остановить доступ сотрудников и очереди на согласованное окно. Снять backup:
+```bash
+source ~/promolux/deploy.local.env
+cd ~/promolux/current
+"$PHP_BIN" artisan down
+# Закрытый файл db-backup.cnf содержит проверенные реквизиты именно рабочей БД.
+mariadb-dump --defaults-extra-file="$HOME/promolux/db-backup.cnf" --single-transaction --routines --triggers '<имя БД>' > '<закрытый путь backup.sql>'
+tar -czf '<закрытый путь shared.tar.gz>' -C ~/promolux/shared .env storage
+```
+Проверить восстановление копий отдельно до продолжения. Обновить APP_VERSION
+в shared/.env до 0.3.9, не менять ключ, базу, пароли и остальные параметры.
+```bash
+cd ~/promolux/releases/'<утверждённый SHA>'
+"$PHP_BIN" artisan migrate:status
+"$PHP_BIN" artisan migrate --pretend
+# Допускается только ожидаемая добавочная миграция tasks.created_by.
+"$PHP_BIN" artisan migrate --force
+cd ~/repositories/promolux-crm
+bash tools/deploy-cpanel.sh activate
+```
+Activate проверяет current, утверждённый SHA, версию, платформу и наличие всех
+миграций до атомарного переключения. Предыдущий путь записывается в
+previous-<SHA>. Проверить HTTPS, вход пяти ролей, поручения, Kanban, суммы,
+вкладки, вложения и /crm/about в режиме обслуживания, затем artisan up.
+Перезапуск очередей и OPcache выполнить штатными средствами хостинга.
+
+Откат в окне обслуживания (после проверки схемной совместимости на копии):
+```bash
+previous="$(cat ~/promolux/previous-'<утверждённый SHA>')"
+test "$previous" = "$HOME/promolux/releases/<предыдущий SHA>"
+test -d "$previous/vendor"
+# Вернуть только APP_VERSION=0.3.8 в shared/.env.
+cd "$previous"
+"$PHP_BIN" artisan config:cache
+"$PHP_BIN" artisan route:cache
+"$PHP_BIN" artisan view:cache
+test ! -e ~/promolux/current.rollback
+ln -s "$previous" ~/promolux/current.rollback
+mv -Tf ~/promolux/current.rollback ~/promolux/current
+# После приёмки прежнего выпуска:
+"$PHP_BIN" artisan up
+```
+Не восстанавливать старую БД поверх новых операций. При повреждении данных
+остановить работы и согласовать отдельное восстановление с сохранением записей.

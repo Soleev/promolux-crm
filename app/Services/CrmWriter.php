@@ -23,6 +23,9 @@ class CrmWriter
     {
         $user = auth()->user();
         abort_unless($user && CrmAccess::manage($user, $model), 403);
+        if ($model === Task::class) {
+            return app(TaskWriter::class)->save($input, $record);
+        }
         if ($record) {
             Gate::authorize('update', $record);
         }
@@ -30,7 +33,6 @@ class CrmWriter
             Client::class => ['name' => 'required|string|max:255', 'manager_id' => 'nullable|exists:users,id', 'phone' => 'nullable|string|max:100', 'email' => 'nullable|email|max:255', 'source' => 'nullable|string|max:255', 'notes' => 'nullable|string|max:10000', 'contacts' => 'nullable|array', 'contacts.*.name' => 'required|string|max:255', 'contacts.*.phone' => 'nullable|string|max:100', 'contacts.*.email' => 'nullable|email|max:255'],
             Deal::class => ['title' => 'required|string|max:255', 'client_id' => 'required|exists:clients,id', 'manager_id' => 'nullable|exists:users,id', 'status' => ['required', Rule::in(['new', 'qualifying', 'estimate', 'proposal', 'won', 'lost'])], 'currency' => ['required', Rule::in(['UZS'])], 'description' => 'nullable|string|max:10000', 'lost_reason' => 'required_if:status,lost|nullable|string|max:5000'],
             Order::class => ['number' => ['required', 'string', 'max:100', Rule::unique('orders')->ignore($record?->id)], 'client_id' => 'required|exists:clients,id', 'manager_id' => 'nullable|exists:users,id', 'currency' => ['required', Rule::in(['UZS'])], 'status' => ['required', Rule::in(['new', 'design', 'production', 'ready', 'delivered', 'cancelled'])], 'due_at' => 'nullable|date', 'description' => 'nullable|string|max:10000', 'attachment' => 'nullable|string|max:255'],
-            Task::class => ['title' => 'required|string|max:255', 'manager_id' => 'required|exists:users,id', 'client_id' => 'nullable|exists:clients,id', 'deal_id' => 'nullable|exists:deals,id', 'order_id' => 'nullable|exists:orders,id', 'due_at' => 'required|date', 'status' => ['required', Rule::in(['open', 'in_progress', 'done', 'cancelled'])], 'notes' => 'nullable|string|max:10000'],
             Expense::class => ['paid_at' => 'required|date', 'category' => 'required|string|max:255', 'amount' => 'required|string', 'currency' => ['required', Rule::in(['UZS'])], 'payer' => ['required', Rule::in(['SFP', 'Promolux'])], 'order_id' => 'nullable|exists:orders,id', 'notes' => 'nullable|string|max:10000'],
             User::class => ['name' => 'required|string|max:255', 'email' => ['required', 'email', Rule::unique('users')->ignore($record?->id)], 'password' => [$record ? 'nullable' : 'required', 'string', 'min:12'], 'role' => ['required', Rule::in(array_keys(User::ROLE_LABELS))], 'active' => 'required|boolean'],
             default => abort(403),
@@ -74,7 +76,7 @@ class CrmWriter
         }
         if (! empty($data['manager_id'])) {
             $manager = User::findOrFail($data['manager_id']);
-            if (! $manager->active || ($model !== Task::class && ! CrmAccess::salesAssignees($user, $record)->whereKey($manager->id)->exists())) {
+            if (! $manager->active || ! CrmAccess::salesAssignees($user, $record)->whereKey($manager->id)->exists()) {
                 throw ValidationException::withMessages(['data.manager_id' => 'Выберите активного менеджера.']);
             }
         }

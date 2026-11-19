@@ -8,6 +8,8 @@ class SupplierResource extends CatalogResource
 {
     protected static ?string $model = CatalogSupplier::class;
 
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
+
     protected static ?string $modelLabel = 'Исполнитель';
 
     protected static ?string $pluralModelLabel = 'Исполнители';

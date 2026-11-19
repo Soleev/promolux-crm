@@ -62,6 +62,16 @@ class RecordDetails
         if (isset($attributes['kind'])) {
             $attributes['kind'] = CrmForms::kindLabels()[$attributes['kind']] ?? $attributes['kind'];
         }
+        if ($record instanceof Task) {
+            unset($attributes['manager_id'], $attributes['created_by']);
+            $attributes['creator_name'] = $record->creator?->name ?? 'Не указан';
+            $attributes['assignee_name'] = $record->manager?->name ?? 'Не указан';
+            foreach (['client_id' => Client::class, 'deal_id' => Deal::class, 'order_id' => Order::class] as $field => $model) {
+                if ($record->$field && ! CrmAccess::query($model)->whereKey($record->$field)->exists()) {
+                    unset($attributes[$field]);
+                }
+            }
+        }
         if ($record instanceof User) {
             $attributes['role'] = User::ROLE_LABELS[$record->role] ?? $record->role;
             $attributes['active'] = $record->active ? 'Разрешён' : 'Отключён';

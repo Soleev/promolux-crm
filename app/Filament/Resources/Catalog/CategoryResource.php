@@ -8,6 +8,8 @@ class CategoryResource extends CatalogResource
 {
     protected static ?string $model = CatalogCategory::class;
 
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-squares-2x2';
+
     protected static ?string $modelLabel = 'Категория';
 
     protected static ?string $pluralModelLabel = 'Категории';

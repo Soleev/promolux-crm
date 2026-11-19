@@ -20,6 +20,7 @@ use App\Services\Ledger;
 use App\Services\Money;
 use App\Services\RecordDetails;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Textarea;
@@ -101,7 +102,7 @@ abstract class CrmResource extends Resource
             Client::class => [$text('name', 'Клиент'), $text('phone', 'Телефон'), $text('manager.name', 'Менеджер'), $text('source', 'Источник')],
             Deal::class => [$text('title', 'Сделка'), $text('client.name', 'Клиент'), $text('manager.name', 'Менеджер'), $text('status', 'Этап')->formatStateUsing(fn ($state) => CrmForms::dealStatuses()[$state] ?? $state)->badge()->color(fn ($state) => CrmTableUi::color($state)), $text('currency', 'Валюта')],
             Order::class => Orders\OrderResource::orderColumns($text),
-            Task::class => [$text('title', 'Задача'), $text('manager.name', 'Ответственный'), TextColumn::make('due_at')->label('Срок')->dateTime('d.m.Y H:i')->sortable()->color(fn ($record) => $record->due_at->isPast() && ! in_array($record->status, ['done', 'cancelled']) ? 'danger' : null), $text('status', 'Статус')->formatStateUsing(fn ($state) => CrmForms::taskStatuses()[$state] ?? $state)->badge()->color(fn ($state) => CrmTableUi::color($state))],
+            Task::class => [$text('title', 'Задача'), $text('manager.name', 'Ответственный'), TextColumn::make('due_at')->label('Срок')->dateTime('d.m.Y H:i')->sortable()->badge()->color(fn ($record) => $record->due_at->isPast() && ! in_array($record->status, ['done', 'cancelled']) ? 'danger' : null), $text('status', 'Статус')->formatStateUsing(fn ($state) => CrmForms::taskStatuses()[$state] ?? $state)->badge()->color(fn ($state) => CrmTableUi::color($state))],
             Payment::class => [$text('order.number', 'Заказ'), TextColumn::make('paid_at')->label('Дата оплаты')->date('d.m.Y')->sortable(), $money('amount_minor', 'Оплачено SFP'), TextColumn::make('method')->label('Способ оплаты')->searchable(), $text('currency', 'Валюта'), $text('manager.name', 'Менеджер'), TextColumn::make('calculation_status')->label('Расчёт')->formatStateUsing(fn ($state) => $state === 'calculated' ? 'Начислено' : 'Требует уточнения')->badge()->color(fn ($state) => CrmTableUi::color($state)), TextColumn::make('reversal_of')->label('Сторно оплаты №')],
             Accrual::class => [TextColumn::make('id')->label('№'), $text('payment.order.number', 'Заказ'), TextColumn::make('payment.paid_at')->label('Дата оплаты')->date('d.m.Y')->sortable(), $text('beneficiary.name', 'Получатель'), $text('kind', 'Начисление')->formatStateUsing(fn ($state) => CrmForms::kindLabels()[$state] ?? $state), $money('amount_minor', 'Начислено'), $money('outstanding_minor', 'Остаток'), $text('currency', 'Валюта')],
             Payout::class => [TextColumn::make('id')->label('№'), TextColumn::make('paid_at')->label('Дата')->date('d.m.Y')->sortable(), $text('payer', 'Плательщик'), $text('recipient.name', 'Фактический получатель'), $money('amount_minor', 'Выплачено'), $text('currency', 'Валюта'), TextColumn::make('reversal_of')->label('Сторно выплаты №')],
@@ -159,7 +160,8 @@ abstract class CrmResource extends Resource
             });
         }
         if (in_array($model, [Client::class, Deal::class, Order::class, Task::class, Payment::class])) {
-            $filters[] = SelectFilter::make('manager_id')->label('Менеджер')->options(fn () => CrmAccess::query(User::class)->pluck('name', 'id'));
+            $filters[] = SelectFilter::make('manager_id')->label($model === Task::class ? 'Исполнитель' : 'Менеджер')
+                ->options(fn () => ($model === Task::class ? CrmAccess::taskAssignees(auth()->user()) : CrmAccess::query(User::class))->pluck('name', 'id'));
         }
         $dateColumn = match ($model) {
             Client::class, Deal::class, Order::class, User::class, Activity::class => 'created_at',
@@ -198,7 +200,22 @@ abstract class CrmResource extends Resource
             $filters[] = SelectFilter::make('active')->label('Доступ')->options([1 => 'Разрешён', 0 => 'Отключён']);
         }
 
+        if (in_array($model, [Deal::class, Task::class], true)) {
+            $actions[0]->icon('heroicon-o-eye')->iconButton()->tooltip('Подробнее');
+            $actions[1]->icon('heroicon-o-pencil-square')->iconButton()->tooltip('Изменить');
+            if ($model === Deal::class) {
+                $actions[2]->icon('heroicon-o-arrow-right-circle')->iconButton()->tooltip('В заказ');
+            }
+        }
+        if ($model === Order::class) {
+            $actions[0]->icon('heroicon-o-eye');
+            $actions[1]->icon('heroicon-o-pencil-square');
+            $actions = [ActionGroup::make($actions)->label('Действия')->icon('heroicon-m-ellipsis-vertical')];
+        }
         $table->columns($columns)->filters($filters)->recordActions($actions)->defaultSort('id', 'desc')->recordUrl(null);
+        if (in_array($model, [Deal::class, Order::class, Task::class], true)) {
+            $table->stackedOnMobile();
+        }
 
         return CrmTableUi::configure($table, $model, static::createAction(), fn (): bool => static::canCreate());
     }

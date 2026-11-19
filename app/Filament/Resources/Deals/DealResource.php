@@ -12,6 +12,7 @@ use App\Services\CrmAccess;
 use App\Services\DealStages;
 use App\Services\RecordDetails;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -51,7 +52,15 @@ class DealResource extends CrmResource
             'tasks' => fn ($tasks) => $tasks->whereIn('id', CrmAccess::query(Task::class)->select('id'))
                 ->whereIn('status', ['open', 'in_progress'])->orderBy('due_at')->orderBy('id')->limit(1),
         ]))->content(fn ($livewire) => $livewire->viewMode === 'kanban' ? view('filament.deals.kanban') : null)
-            ->recordActions([...$table->getRecordActions(), static::stageAction(), static::openOrderAction()]);
+            ->recordActions([
+                $table->getAction('details'),
+                ActionGroup::make([
+                    $table->getAction('edit'),
+                    $table->getAction('convert'),
+                    static::stageAction(),
+                    static::openOrderAction(),
+                ])->icon('heroicon-m-ellipsis-vertical')->label('Действия'),
+            ]);
     }
 
     public static function productionLabel(Deal $deal): string

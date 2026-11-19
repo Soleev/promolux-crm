@@ -13,6 +13,15 @@ source "$base/deploy.local.env"
 : "${PHP_BIN:?Set PHP_BIN}" "${COMPOSER_PHAR:?Set COMPOSER_PHAR}"
 test -z "$(git status --porcelain)"
 commit="$(git rev-parse HEAD)"
+# Operator approval is bound to both ends of the transition.
+: "${EXPECTED_CURRENT_SHA:?Set expected current SHA}" "${EXPECTED_CURRENT_VERSION:?Set current version}" "${TARGET_VERSION:?Set target version}"
+[[ "$EXPECTED_CURRENT_SHA" =~ ^[0-9a-f]{40}$ ]]
+export TARGET_VERSION EXPECTED_CURRENT_VERSION
+previous="$base/releases/$EXPECTED_CURRENT_SHA"
+test -L "$base/current"
+test "$(readlink -f "$base/current")" = "$previous"
+test "$("$PHP_BIN" -r '$r=require $argv[1]; echo array_key_first($r);' "$previous/config/releases.php")" = "$EXPECTED_CURRENT_VERSION"
+test "$("$PHP_BIN" -r '$r=require "config/releases.php"; echo array_key_first($r);')" = "$TARGET_VERSION"
 test "$(cat "$base/approved-commit")" = "$commit" || { echo 'Commit not approved'; exit 1; }
 test -f public/build/manifest.json
 test -f "$base/shared/.env"
@@ -55,26 +64,23 @@ cd "$release"
 test -f "$base/installation-ready"
 test -L "$HOME/public_html/promolux"
 test "$(readlink "$HOME/public_html/promolux")" = "$base/current/public"
-if test -e "$base/current"; then
-    test -L "$base/current"
-    test "$(readlink -f "$base/current")" = "$(cat "$base/previous-0.3.8")"
-    test "$(basename "$(readlink -f "$base/current")")" = c853adf4e1b529697750bfbdfc7b4144d0e0eb9c
-fi
+test ! -e "$base/current.next" && test ! -L "$base/current.next"
+test ! -e "$base/previous-$commit"
 "$PHP_BIN" artisan config:cache
 "$PHP_BIN" -r '
 require "vendor/autoload.php";
 $app = require "bootstrap/app.php";
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-if (config("app.version") !== "0.3.8" || config("app.debug") || config("database.default") !== "mariadb") exit(1);
+if (config("app.version") !== getenv("TARGET_VERSION") || config("app.debug") || config("database.default") !== "mariadb") exit(1);
 $db = Illuminate\Support\Facades\DB::class;
-if (! $db::table("migrations")->where("migration", "2026_11_17_000000_add_product_catalog")->exists()) exit(1);
-foreach (["catalog_categories" => ["cat-%02d", 13], "catalog_products" => ["pl-%03d", 80]] as $table => [$format, $count]) {
-    $codes = array_map(fn ($n) => sprintf($format, $n), range(1, $count));
-    if ($db::table($table)->whereIn("code", $codes)->count() !== $count) exit(1);
+foreach (glob("database/migrations/*.php") as $migration) {
+    if (! $db::table("migrations")->where("migration", basename($migration, ".php"))->exists()) exit(1);
 }
+if (! Illuminate\Support\Facades\Schema::hasColumn("tasks", "created_by")) exit(1);
 '
 "$PHP_BIN" artisan route:cache
 "$PHP_BIN" artisan view:cache
+printf '%s\n' "$previous" > "$base/previous-$commit"
 ln -s "$release" "$base/current.next"
 mv -Tf "$base/current.next" "$base/current"
 mv "$base/approved-commit" "$base/approved-commit.used"

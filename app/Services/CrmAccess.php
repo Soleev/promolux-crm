@@ -44,8 +44,39 @@ class CrmAccess
             User::class => $user->role === 'rop' ? $q->where('role', 'manager') : $q->whereKey($user->id),
             OrderItem::class => $q->whereIn('order_id', self::query(Order::class, $user)->select('id')),
             Payment::class => $user->role === 'rop' ? $q : $q->where('manager_id', $user->id),
-            Client::class,Deal::class,Order::class,Task::class => $user->role === 'rop' ? $q : $q->where('manager_id', $user->id),
+            Task::class => self::visibleTasks($q, $user),
+            Client::class,Deal::class,Order::class => $user->role === 'rop' ? $q : $q->where('manager_id', $user->id),
             default => $q->whereRaw('1 = 0'),
+        };
+    }
+
+    private static function visibleTasks(Builder $query, User $user): Builder
+    {
+        if ($user->role === 'rop') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $tasks) use ($user) {
+            $tasks->where('manager_id', $user->id);
+            if ($user->role === 'manager' && Task::supportsDelegation()) {
+                $tasks->orWhere(fn (Builder $delegated) => $delegated->where('created_by', $user->id)
+                    ->whereHas('manager', fn (Builder $assignee) => $assignee->where('role', 'designer')));
+            }
+        });
+    }
+
+    public static function taskAssignees(User $actor): Builder
+    {
+        $users = User::where('active', true);
+        if (! self::manage($actor, Task::class)) {
+            return $users->whereRaw('1 = 0');
+        }
+
+        return match ($actor->role) {
+            'owner', 'rop' => $users,
+            'manager' => $users->where(fn (Builder $q) => $q->whereKey($actor->id)
+                ->when(Task::supportsDelegation(), fn (Builder $eligible) => $eligible->orWhere('role', 'designer'))),
+            default => $users->whereKey($actor->id),
         };
     }
 

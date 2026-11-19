@@ -7,7 +7,7 @@ case "${1:-prepare}" in
     *) echo 'Usage: deploy-cpanel.sh [prepare|activate]' >&2; exit 2 ;;
 esac
 base="$HOME/promolux"
-# This private file defines absolute PHP_BIN and COMPOSER_PHAR paths only.
+# Private configuration: PHP/Composer paths and approved transition parameters.
 test -f "$base/deploy.local.env"
 source "$base/deploy.local.env"
 : "${PHP_BIN:?Set PHP_BIN}" "${COMPOSER_PHAR:?Set COMPOSER_PHAR}"

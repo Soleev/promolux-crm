@@ -15,16 +15,16 @@
         <div class="space-y-6">
             @foreach($releases as $releaseVersion => $release)
                 @if(version_compare($releaseVersion, $version, '<='))
-                    <article>
-                        <h2 class="font-semibold">v{{ $releaseVersion }}{{ $release['date'] ? ' · '.\Carbon\CarbonImmutable::parse($release['date'])->format('d.m.Y') : '' }}</h2>
+                    <details class="plx-release">
+                        <summary class="font-semibold cursor-pointer">v{{ $releaseVersion }}{{ $release['date'] ? ' · '.\Carbon\CarbonImmutable::parse($release['date'])->format('d.m.Y') : '' }}</summary>
                         <ul class="mt-2 list-disc space-y-1 ps-5 text-sm text-gray-600 dark:text-gray-300">
                             @foreach($release['changes'] as $change)<li>{{ $change }}</li>@endforeach
                         </ul>
-                    </article>
+                    </details>
                 @endif
             @endforeach
-            <article>
-                <h2 class="font-semibold">Подготовительный этап · 04–06.11.2026</h2>
+            <details class="plx-release">
+                <summary class="font-semibold cursor-pointer">Подготовительный этап · 04–06.11.2026</summary>
                 <p>Создание первой рабочей версии Promolux CRM.</p>
                 <ul class="mt-2 list-disc space-y-1 ps-5 text-sm text-gray-600 dark:text-gray-300">
                     <li>Создана архитектура Laravel 13 + Filament 5 + Livewire 4; настроена локальная разработка Laravel Herd.</li>
@@ -34,7 +34,7 @@
                     <li>Добавлена сверка финансовых операций и остатков.</li>
                     <li>Созданы обзор бизнеса, финансовые отчёты, реестры, CSV-экспорт и аудит действий.</li>
                 </ul>
-            </article>
+            </details>
         </div>
     </x-filament::section>
 </x-filament-panels::page>

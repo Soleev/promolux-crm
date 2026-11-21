@@ -88,7 +88,7 @@ class DealResource extends CrmResource
     public static function stageAction(): Action
     {
         return Action::make('changeStage')->label('Изменить этап')->icon('heroicon-o-arrows-right-left')
-            ->authorize(fn (Deal $record) => ! request()->attributes->get('preview_applied') && Gate::allows('update', $record))
+            ->authorize(fn (Deal $record) => Gate::allows('update', $record))
             ->visible(fn (Deal $record) => count(DealStages::targets($record)) > 0)
             ->modalHeading('Изменение этапа сделки')->modalSubmitActionLabel('Сохранить этап')
             ->fillForm(fn (Deal $record, array $arguments) => [

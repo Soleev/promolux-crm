@@ -33,7 +33,6 @@ class DealStages
 
     public function move(int $id, string $target, string $expected, ?string $reason = null): Deal
     {
-        abort_if(request()->attributes->get('preview_applied'), 403);
 
         return DB::transaction(function () use ($id, $target, $expected, $reason): Deal {
             $deal = Deal::query()->lockForUpdate()->findOrFail($id);

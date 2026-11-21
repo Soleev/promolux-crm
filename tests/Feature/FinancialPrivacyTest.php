@@ -53,12 +53,3 @@ it('enforces financial confidentiality across pages, export and related records'
     expect(RecordDetails::get($payment)['accruals'])->toBeEmpty();
     expect(app(Report::class)->build($actor, null, null)['currencies']['UZS'])->not->toHaveKey('owner_gross');
 })->with(['owner', 'rop', 'manager', 'designer', 'cashier']);
-
-it('applies the preview role to financial exports until the owner exits preview', function () {
-    [$owner, , $manager] = crmScenario();
-    $this->actingAs($owner)->post('/crm/preview-role', ['view_as' => 'user:'.$manager->id])->assertRedirect();
-    $this->get('/crm-register.csv')->assertForbidden();
-    $this->get('/crm/overview')->assertOk()->assertDontSee('Скачать реестр CSV');
-    $this->post('/crm/exit-preview')->assertRedirect();
-    $this->get('/crm-register.csv')->assertOk();
-});

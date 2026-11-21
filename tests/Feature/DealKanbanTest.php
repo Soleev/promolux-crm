@@ -12,7 +12,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -66,19 +65,6 @@ it('prefills a dragged target and rejects a stale board submission', function ()
     app(DealStages::class)->move($deal->id, 'estimate', 'new');
     $page->callMountedTableAction()->assertHasErrors(['status']);
     expect($deal->fresh()->status)->toBe('estimate');
-});
-
-it('keeps role preview read only for stage changes', function () {
-    $owner = User::factory()->create(['role' => 'owner', 'active' => true]);
-    $deal = kanbanDeal($owner);
-    $this->actingAs($owner);
-    request()->attributes->set('preview_applied', true);
-    try {
-        expect(fn () => app(DealStages::class)->move($deal->id, 'proposal', 'new'))->toThrow(HttpException::class);
-        expect($deal->fresh()->status)->toBe('new');
-    } finally {
-        request()->attributes->remove('preview_applied');
-    }
 });
 
 it('rejects invalid and stale transitions without adding history', function (string $target, string $expected) {

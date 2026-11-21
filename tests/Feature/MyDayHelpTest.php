@@ -141,14 +141,3 @@ it('keeps a task deadline compulsory and excludes cancelled and delivered orders
         'title' => 'Без срока', 'manager_id' => $manager->id, 'status' => 'open',
     ]))->toThrow(ValidationException::class);
 });
-
-it('rejects quick completion during role preview', function () {
-    [$manager] = dailyAssignments();
-    $task = Task::create(['title' => 'Только чтение', 'manager_id' => $manager->id, 'status' => 'open', 'due_at' => now()]);
-    $owner = User::factory()->create(['role' => 'owner', 'active' => true]);
-    $this->actingAs($owner)->post('/crm/preview-role', ['view_as' => 'user:'.$manager->id])->assertRedirect();
-    $this->get('/crm/my-day')->assertOk()->assertSee('Только чтение')->assertDontSee('wire:click="complete(', false);
-    $this->actingAs($manager);
-    Livewire::test(MyDay::class)->call('complete',$task->id)->assertForbidden();
-    expect($task->fresh()->status)->toBe('open');
-});

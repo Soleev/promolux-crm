@@ -36,7 +36,7 @@ class MyDay extends Page
 
     public function complete(int $id): void
     {
-        abort_unless(static::canAccess() && ! session()->has('crm_preview'), 403);
+        abort_unless(static::canAccess(), 403);
         DB::transaction(function () use ($id) {
             $task = CrmAccess::query(Task::class)->where('manager_id', auth()->id())->lockForUpdate()->findOrFail($id);
             if (! in_array($task->status, ['done', 'cancelled'], true)) {

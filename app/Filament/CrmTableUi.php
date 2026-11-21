@@ -81,7 +81,7 @@ class CrmTableUi
             })];
         if ($create && $label !== '') {
             $actions[] = $create->name('createFromEmpty')->label($label)->authorize($canCreate)
-                ->visible(fn (): bool => ! $filtered() && ! request()->attributes->get('preview_applied') && $canCreate());
+                ->visible(fn (): bool => ! $filtered() && $canCreate());
         }
 
         return $table->identifier(fn (): string => auth()->id().':'.auth()->user()->role)

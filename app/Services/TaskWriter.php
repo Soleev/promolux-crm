@@ -16,7 +16,7 @@ class TaskWriter
     public function save(array $input, ?Task $task): Task
     {
         $actor = auth()->user();
-        abort_unless($actor && CrmAccess::manage($actor, Task::class) && ! session()->has('crm_preview'), 403);
+        abort_unless($actor && CrmAccess::manage($actor, Task::class), 403);
 
         return DB::transaction(function () use ($actor, $input, $task) {
             $status = ['status' => 'required|in:open,in_progress,done,cancelled'];

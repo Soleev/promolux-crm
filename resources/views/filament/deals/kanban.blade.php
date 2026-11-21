@@ -22,7 +22,7 @@
                     @forelse ($groups->get($stage, collect()) as $deal)
                         @php
                             $targets = \App\Services\DealStages::targets($deal);
-                            $editable = ! request()->attributes->get('preview_applied') && \Illuminate\Support\Facades\Gate::allows('update', $deal);
+                            $editable = \Illuminate\Support\Facades\Gate::allows('update', $deal);
                             $next = $deal->tasks->first();
                             $total = array_sum(array_map(fn ($item) => (int) $item['quantity'] * (int) $item['price_minor'], $deal->items ?? []));
                         @endphp

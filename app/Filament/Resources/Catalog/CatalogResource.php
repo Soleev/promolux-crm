@@ -52,7 +52,7 @@ abstract class CatalogResource extends Resource
     {
         $user = auth()->user();
 
-        return $user?->active && ! request()->attributes->get('preview_applied') &&
+        return $user?->active &&
             ($user->role === 'owner' || ($user->role === 'rop' && in_array(static::$model, [CatalogCategory::class, CatalogProduct::class, CatalogSupplier::class], true)));
     }
 

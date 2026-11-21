@@ -231,29 +231,6 @@ it('records a transfer immediately and cancels a pending cash entry without post
     $this->assertDatabaseCount('payments', 1);
 });
 
-it('lets the owner browse the selected employee and return without granting write access', function () {
-    [$owner,,$manager,$order] = crmScenario();
-    $other = User::factory()->create(['active' => true, 'role' => 'manager']);
-    $otherClient = Client::create(['name' => 'Другой клиент', 'manager_id' => $other->id, 'notes'=>'Закрытая заметка другого сотрудника']);
-
-    $this->get('/crm/overview')->assertOk()->assertSee('Просмотр роли');
-    $this->post('/crm/preview-role', ['view_as' => 'user:'.$manager->id])->assertRedirect('/crm');
-    $this->get('/crm/clients')->assertOk()->assertSee('Вернуться к владельцу')->assertSee($order->client->name)->assertSee($otherClient->name)->assertDontSee($otherClient->notes);
-    $this->get('/crm/expenses')->assertForbidden();
-    $this->post('/crm/preview-role', ['view_as' => 'cashier'])->assertForbidden();
-    $this->post('/crm/exit-preview')->assertRedirect('/crm');
-    $this->get('/crm/expenses')->assertOk();
-    expect($owner->fresh()->role)->toBe('owner')->and($manager->fresh()->role)->toBe('manager');
-
-    foreach (['rop' => '/crm/orders', 'cashier' => '/crm/cash-receipts', 'designer' => '/crm/orders', 'manager' => '/crm/clients'] as $role => $page) {
-        $this->post('/crm/preview-role', ['view_as' => $role])->assertRedirect('/crm');
-        $this->get($page)->assertOk()->assertSee('Вернуться к владельцу');
-        $this->post('/crm/exit-preview')->assertRedirect('/crm');
-    }
-    $this->actingAs($manager)->post('/crm/preview-role', ['view_as' => 'user:'.$owner->id])->assertForbidden();
-    $this->post('/crm/exit-preview')->assertForbidden();
-});
-
 it('lets a designer take their own orders, transfers and cash without access to other orders or settlements', function () {
     [$owner,,$manager,$foreignOrder,$input] = crmScenario();
     $designer = User::factory()->create(['active' => true, 'role' => 'designer']);

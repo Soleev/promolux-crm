@@ -23,12 +23,10 @@ it('shows the same application release and Tashkent clock across roles and pages
     ['designer', '/crm/orders'], ['cashier', '/crm/cash-receipts'],
 ]);
 
-it('requires an active session for application information and supports read only role preview', function () {
+it('requires an active session for application information', function () {
     $this->get('/crm/about')->assertRedirect('/crm/login');
     $owner = User::factory()->create(['role' => 'owner', 'active' => true]);
-    $this->actingAs($owner)->post('/crm/preview-role', ['view_as' => 'cashier'])->assertRedirect('/crm');
-    $this->get('/crm/about')->assertOk()->assertSee('v'.config('app.version'));
-    $this->post('/crm/exit-preview')->assertRedirect('/crm');
+    $this->actingAs($owner)->get('/crm/about')->assertOk()->assertSee('v'.config('app.version'));
     $this->actingAs(User::factory()->create(['role' => 'manager', 'active' => false]));
     $this->get('/crm/about')->assertForbidden();
 });

@@ -1,17 +1,16 @@
 <x-filament-panels::page>
     @php
         $details = fn ($resource, $id) => $resource::getUrl('index', ['tableAction' => 'details', 'tableActionRecord' => $id]);
-        $canCreate = ! session()->has('crm_preview');
     @endphp
     <nav class="plx-day-toolbar" aria-label="Быстрые действия">
         <div class="plx-day-primary">
-            @if($canCreate && isset($resources['заказ']) && $resources['заказ']::canCreate())
+            @if(isset($resources['заказ']) && $resources['заказ']::canCreate())
                 <x-filament::button tag="a" :href="$resources['заказ']::getUrl('index', ['action' => 'create'])" icon="heroicon-m-plus">Создать заказ</x-filament::button>
             @endif
-            @if($canCreate && isset($resources['сделку']) && $resources['сделку']::canCreate())
+            @if(isset($resources['сделку']) && $resources['сделку']::canCreate())
                 <x-filament::button tag="a" :href="$resources['сделку']::getUrl('index', ['action' => 'create'])" color="gray" icon="heroicon-o-plus">Создать сделку</x-filament::button>
             @endif
-            @if($canCreate && isset($resources['задачу']) && $resources['задачу']::canCreate())
+            @if(isset($resources['задачу']) && $resources['задачу']::canCreate())
                 <x-filament::button tag="a" :href="$resources['задачу']::getUrl('index', ['action' => 'create'])" color="gray" icon="heroicon-o-plus">Создать задачу</x-filament::button>
             @endif
         </div>
@@ -20,7 +19,7 @@
                 @if($noun !== 'задачу')
                     <x-filament::link color="gray" :href="$resource::getUrl()">Открыть {{ $noun }}</x-filament::link>
                 @endif
-                @if($noun === 'клиента' && $canCreate && $resource::canCreate())
+                @if($noun === 'клиента' && $resource::canCreate())
                     <x-filament::link color="gray" :href="$resource::getUrl('index', ['action' => 'create'])">Создать клиента</x-filament::link>
                 @endif
             @endforeach
@@ -57,9 +56,7 @@
                             @foreach([['клиента',$task->client_name,$task->client_id], ['сделку',$task->deal_title,$task->deal_id], ['заказ',$task->visible_order ? 'Заказ № '.$task->visible_order : null,$task->visible_order]] as [$type,$name,$id])
                                 @if($name)<x-filament::link color="gray" :href="$details($resources[$type],$id)">{{ $name }}</x-filament::link>@endif
                             @endforeach
-                            @if(!session()->has('crm_preview'))
-                                <x-filament::button size="sm" color="gray" wire:click="complete({{ $task->id }})" wire:loading.attr="disabled">Завершить</x-filament::button>
-                            @endif
+                            <x-filament::button size="sm" color="gray" wire:click="complete({{ $task->id }})" wire:loading.attr="disabled">Завершить</x-filament::button>
                         </li>
                     @empty <li class="plx-empty">{{ $empty }}</li> @endforelse
                 </ul>

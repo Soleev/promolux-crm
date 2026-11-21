@@ -6,7 +6,6 @@ use App\Filament\LocalAvatar;
 use App\Filament\Pages\About;
 use App\Filament\Pages\Help;
 use App\Filament\Pages\Overview;
-use App\Http\Middleware\RolePreview;
 use Filament\Actions\Action;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -52,7 +51,7 @@ class AdminPanelProvider extends PanelProvider
             ->databaseTransactions()
             ->login()
             ->colors([
-                'primary' => Color::Indigo,
+                'primary' => Color::hex('#5B35E5'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
@@ -67,7 +66,7 @@ class AdminPanelProvider extends PanelProvider
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
                 AuthenticateSession::class,
-                RolePreview::class,
+
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,

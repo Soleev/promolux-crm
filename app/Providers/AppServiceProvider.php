@@ -31,6 +31,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Pulse is restricted in every environment, including local and testing.
+        Gate::define('viewPulse', fn (?User $user): bool => $user?->active === true && in_array($user->role, ['owner', 'tech_admin'], true));
+
         foreach ([Client::class, Deal::class, Order::class, Task::class, Payment::class, Accrual::class, Payout::class, Expense::class, Activity::class, User::class] as $model) {
             Gate::policy($model, CrmPolicy::class);
         }

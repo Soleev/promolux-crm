@@ -44,3 +44,19 @@ it('shows the confirmed date of v0.3.8 without exposing configuration', function
     $this->actingAs(User::factory()->create(['role' => 'owner', 'active' => true]));
     $this->get('/crm/about')->assertOk()->assertSee('17.11.2026')->assertDontSee('Не указана');
 });
+
+
+it('renders complete release history openly in descending order', function () {
+    config(['app.version' => '0.4.1']);
+    $this->actingAs(User::factory()->create(['role' => 'owner', 'active' => true]));
+    $response = $this->get('/crm/about')->assertOk()
+        ->assertSeeInOrder(['v0.4.1', 'v0.4.0', 'v0.3.9', 'v0.3.8', 'v0.1.0', 'Подготовительный этап'])
+        ->assertDontSee('<details', false)->assertDontSee('<summary', false);
+    foreach (config('releases') as $release) {
+        $response->assertSee($release['title']);
+        foreach ($release['changes'] as $change) {
+            $response->assertSee($change);
+        }
+    }
+    expect(config('releases')['0.4.1']['date'])->toBe('2026-11-21');
+});

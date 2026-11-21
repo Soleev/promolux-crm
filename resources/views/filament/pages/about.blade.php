@@ -2,6 +2,7 @@
     @php
         $version = config('app.version');
         $releases = array_filter(config('releases', []), fn ($entry) => version_compare($entry, $version, '<='), ARRAY_FILTER_USE_KEY);
+        uksort($releases, fn ($a, $b) => version_compare($b, $a));
         $current = $releases[$version] ?? null;
     @endphp
     <x-filament::section heading="Promolux CRM">
@@ -12,21 +13,25 @@
         <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">CRM, заказы, задачи и учёт расчётов Promolux. Время приложения — Ташкент (UTC+5).</p>
     </x-filament::section>
     <x-filament::section heading="История изменений">
-        <div class="space-y-6">
+        <ol class="plx-release-timeline" aria-label="История версий">
             @foreach($releases as $releaseVersion => $release)
                 @if(version_compare($releaseVersion, $version, '<='))
-                    <details class="plx-release">
-                        <summary class="font-semibold cursor-pointer">v{{ $releaseVersion }}{{ $release['date'] ? ' · '.\Carbon\CarbonImmutable::parse($release['date'])->format('d.m.Y') : '' }}</summary>
-                        <ul class="mt-2 list-disc space-y-1 ps-5 text-sm text-gray-600 dark:text-gray-300">
+                    <li class="plx-release">
+                        <div class="plx-release-meta">
+                            <h2 class="plx-release-version">v{{ $releaseVersion }}</h2>
+                            @if($release['date'])<time datetime="{{ $release['date'] }}">{{ \Carbon\CarbonImmutable::parse($release['date'])->format('d.m.Y') }}</time>@endif
+                        </div>
+                        <h3 class="plx-release-title">{{ $release['title'] ?? 'Обновление Promolux CRM' }}</h3>
+                        <ul class="plx-release-changes">
                             @foreach($release['changes'] as $change)<li>{{ $change }}</li>@endforeach
                         </ul>
-                    </details>
+                    </li>
                 @endif
             @endforeach
-            <details class="plx-release">
-                <summary class="font-semibold cursor-pointer">Подготовительный этап · 04–06.11.2026</summary>
+            <li class="plx-release plx-release-origin">
+                <div class="plx-release-meta"><h2 class="plx-release-version">Подготовительный этап</h2><span>04–06.11.2026</span></div>
                 <p>Создание первой рабочей версии Promolux CRM.</p>
-                <ul class="mt-2 list-disc space-y-1 ps-5 text-sm text-gray-600 dark:text-gray-300">
+                <ul class="plx-release-changes">
                     <li>Создана архитектура Laravel 13 + Filament 5 + Livewire 4; настроена локальная разработка Laravel Herd.</li>
                     <li>Разработаны модули клиентов, сделок, заказов, задач, оплат, сотрудников и журнала действий.</li>
                     <li>Внедрены роли владельца, РОП, менеджера, дизайнера и кассира.</li>
@@ -34,7 +39,7 @@
                     <li>Добавлена сверка финансовых операций и остатков.</li>
                     <li>Созданы обзор бизнеса, финансовые отчёты, реестры, CSV-экспорт и аудит действий.</li>
                 </ul>
-            </details>
-        </div>
+            </li>
+        </ol>
     </x-filament::section>
 </x-filament-panels::page>

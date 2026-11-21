@@ -111,4 +111,20 @@
 .fi-btn.fi-color-primary:hover { background-color: #4824cc; color: #fff; }
 .fi-btn.fi-color-primary:focus-visible { outline: 2px solid #9c87ff; outline-offset: 3px; }
 .fi-resource-cash-receipts .fi-ta-actions .fi-btn { min-height: 2.75rem; }
-.plx-release { padding-block: .75rem; border-bottom: 1px solid var(--plx-border); }
+/* Open release history, scoped to the About page. */
+.plx-release-timeline { list-style: none; margin: 0; padding: 0 0 0 1rem; max-width: 76ch; }
+.plx-release { position: relative; border-inline-start: 2px solid var(--plx-border); padding: 0 0 2.25rem 1.75rem; overflow-wrap: anywhere; }
+.plx-release::before { content: ''; position: absolute; inset-inline-start: -.45rem; top: .6rem; width: .8rem; height: .8rem; border-radius: 50%; background: #7c5ce7; box-shadow: 0 0 0 5px var(--plx-surface); }
+.plx-release:last-child { padding-bottom: 0; border-color: transparent; }
+.plx-release-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; }
+.plx-release-version { font-size: 1.4rem; font-weight: 700; letter-spacing: -.025em; }
+.plx-release-meta time, .plx-release-meta > span { font-size: .875rem; color: var(--gray-600); font-variant-numeric: tabular-nums; }
+.plx-release-title { font-size: 1rem; font-weight: 600; margin-top: .4rem; }
+.plx-release-changes { list-style: disc; padding-inline-start: 1.2rem; margin-top: .75rem; font-size: 1rem; line-height: 1.7; color: var(--gray-600); }
+.plx-release-changes li + li { margin-top: .5rem; }
+.dark .plx-release-changes, .dark .plx-release-meta time, .dark .plx-release-meta > span { color: var(--gray-300); }
+@media (max-width: 40rem) {
+ .plx-release-timeline { padding-inline-start: .4rem; }
+ .plx-release { padding-inline-start: 1.1rem; padding-bottom: 1.75rem; }
+ .plx-release-version { font-size: 1.25rem; }
+}

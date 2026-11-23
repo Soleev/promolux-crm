@@ -27,6 +27,13 @@ PUBLISHED_IDENTITIES = {
         '0fafc21188c42cb180d371c2ee6f25bb3b28bfdf133dfd2f4a91b18d477386d6'),
 }
 EMAIL_DIGEST = '0fafc21188c42cb180d371c2ee6f25bb3b28bfdf133dfd2f4a91b18d477386d6'
+MERGE_042 = '1f4536be6f97af093fdb50483fd934a4a9abf59c'
+MERGE_042_PARENTS = (
+    '9e8658540274a06e319ab5e086b1f22135a9ad8f',
+    '2b79df7191ffc8e7ae84dcf304f7fff8a5e3c55f',
+)
+GITHUB_COMMITTER_DIGEST = '3c205d8fc749f72977b9331e3179773c315bb1f4860c366de2abe9ec9337730b'
+REPAIR_MESSAGE = b'fix: verify SFP merge commit metadata'
 
 def release_email(value):
     return hashlib.sha256(value).hexdigest() == EMAIL_DIGEST
@@ -34,32 +41,71 @@ def release_email(value):
 
 def commit_metadata(sha, approved_sha):
     raw = git('cat-file', 'commit', sha)
+    headers, separator, message = raw.partition(b'\n\n')
+    lines = headers.split(b'\n')
+    actual_parents = [line[7:] for line in lines if line.startswith(b'parent ')]
     parents = {RELEASE_035: RELEASE_035_PARENT, RELEASE_036: RELEASE_035}
     published = PUBLISHED_IDENTITIES.get(sha)
-    if sha not in parents and sha != approved_sha and published is None:
+    merge = sha == MERGE_042
+    # One bounded scanner-repair commit may use the already-approved owner's
+    # identity when the GitHub connector cannot set a noreply author.
+    repair = (
+        sha not in parents and not published and not merge and sha != approved_sha
+        and message.strip() == REPAIR_MESSAGE
+        and actual_parents == [MERGE_042.encode()]
+        and git('diff-tree', '--no-commit-id', '--name-only', '-r', sha).splitlines()
+            == [b'tools/check-public.py']
+    )
+    if sha not in parents and sha != approved_sha and not published and not merge and not repair:
         return raw
-    if published:
-        # Verify the original Git object before filtering any metadata.
+    if published or merge or repair:
+        # Check against the actual raw commit object, never just displayed metadata.
         object_header = b'commit ' + str(len(raw)).encode() + b'\0'
         if hashlib.sha1(object_header + raw).hexdigest() != sha:
             raise ValueError('Unexpected original commit content')
-    expected_parent, expected_name, expected_email = published or (
-        parents.get(sha, RELEASE_036), b'Shoxrux Soleyev', EMAIL_DIGEST)
-    headers, separator, message = raw.partition(b'\n\n')
-    lines = headers.split(b'\n')
-    if [line[7:] for line in lines if line.startswith(b'parent ')] != [expected_parent.encode()]:
+
+    if merge:
+        expected_parents = [p.encode() for p in MERGE_042_PARENTS]
+        identities = {
+            b'author': (b'Shoxrux', EMAIL_DIGEST),
+            b'committer': (b'GitHub', GITHUB_COMMITTER_DIGEST),
+        }
+    elif repair:
+        expected_parents = [MERGE_042.encode()]
+        identities = {
+            b'author': (b'Shoxrux', EMAIL_DIGEST),
+            b'committer': (b'Shoxrux', EMAIL_DIGEST),
+        }
+    elif published:
+        expected_parent, name, email_digest = published
+        expected_parents = [expected_parent.encode()]
+        identities = {
+            b'author': (name, email_digest),
+            b'committer': (name, email_digest),
+        }
+    else:
+        expected_parents = [parents.get(sha, RELEASE_036).encode()]
+        identities = {
+            b'author': (b'Shoxrux Soleyev', EMAIL_DIGEST),
+            b'committer': (b'Shoxrux Soleyev', EMAIL_DIGEST),
+        }
+
+    if actual_parents != expected_parents:
         raise ValueError('Unexpected release parent for identity approval')
     for field in (b'author', b'committer'):
         indices = [i for i, line in enumerate(lines) if line.startswith(field + b' ')]
         if len(indices) != 1:
             raise ValueError('Unexpected identity headers')
         i = indices[0]
-        match = re.fullmatch(field + b' ' + re.escape(expected_name) + rb' <([^<>\s]+)> [0-9]+ [+-][0-9]{4}', lines[i])
+        expected_name, expected_email = identities[field]
+        match = re.fullmatch(
+            field + b' ' + re.escape(expected_name) + rb' <([^<>\s]+)> [0-9]+ [+-][0-9]{4}',
+            lines[i],
+        )
         if not match or hashlib.sha256(match[1]).hexdigest() != expected_email:
             raise ValueError('Unexpected release identity')
         lines[i] = lines[i][:match.start(1)] + lines[i][match.end(1):]
     return b'\n'.join(lines) + separator + message
-
 
 def check(name, data):
     problems = []

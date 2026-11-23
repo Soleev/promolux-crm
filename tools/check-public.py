@@ -13,10 +13,19 @@ def git(*args):
     return subprocess.check_output(['git', '-C', str(ROOT), *args])
 
 
-# The release identity is public only in the two email fields of one approved commit.
+# Release identities are allowed only in verified author/committer email fields.
 RELEASE_035 = '75271a4d53e62dad75f0f836012c64478c58a00d'
 RELEASE_035_PARENT = '6b898759aeab14265d366e221847a8b3b1963f20'
 RELEASE_036 = 'd2a733de24ad8dc64ebabfc335ec5a40beef09ee'
+# Owner-approved identities in already-published commits; never a domain allowlist.
+PUBLISHED_IDENTITIES = {
+    '1e54d82770cbcd4c55c05bbf0b1834d9f98f934f': (
+        '50d8112f11758cb48ce58ab4a344a9d8c7ec6b65', b'Shoxrux',
+        '0fafc21188c42cb180d371c2ee6f25bb3b28bfdf133dfd2f4a91b18d477386d6'),
+    '9e8658540274a06e319ab5e086b1f22135a9ad8f': (
+        '1e54d82770cbcd4c55c05bbf0b1834d9f98f934f', b'Shoxrux',
+        '0fafc21188c42cb180d371c2ee6f25bb3b28bfdf133dfd2f4a91b18d477386d6'),
+}
 EMAIL_DIGEST = '0fafc21188c42cb180d371c2ee6f25bb3b28bfdf133dfd2f4a91b18d477386d6'
 
 def release_email(value):
@@ -26,19 +35,27 @@ def release_email(value):
 def commit_metadata(sha, approved_sha):
     raw = git('cat-file', 'commit', sha)
     parents = {RELEASE_035: RELEASE_035_PARENT, RELEASE_036: RELEASE_035}
-    if sha not in parents and sha != approved_sha:
+    published = PUBLISHED_IDENTITIES.get(sha)
+    if sha not in parents and sha != approved_sha and published is None:
         return raw
+    if published:
+        # Verify the original Git object before filtering any metadata.
+        object_header = b'commit ' + str(len(raw)).encode() + b'\0'
+        if hashlib.sha1(object_header + raw).hexdigest() != sha:
+            raise ValueError('Unexpected original commit content')
+    expected_parent, expected_name, expected_email = published or (
+        parents.get(sha, RELEASE_036), b'Shoxrux Soleyev', EMAIL_DIGEST)
     headers, separator, message = raw.partition(b'\n\n')
     lines = headers.split(b'\n')
-    if [line[7:] for line in lines if line.startswith(b'parent ')] != [parents.get(sha, RELEASE_036).encode()]:
+    if [line[7:] for line in lines if line.startswith(b'parent ')] != [expected_parent.encode()]:
         raise ValueError('Unexpected release parent for identity approval')
     for field in (b'author', b'committer'):
         indices = [i for i, line in enumerate(lines) if line.startswith(field + b' ')]
         if len(indices) != 1:
             raise ValueError('Unexpected identity headers')
         i = indices[0]
-        match = re.fullmatch(field + rb' Shoxrux Soleyev <([^<>\s]+)> [0-9]+ [+-][0-9]{4}', lines[i])
-        if not match or not release_email(match[1]):
+        match = re.fullmatch(field + b' ' + re.escape(expected_name) + rb' <([^<>\s]+)> [0-9]+ [+-][0-9]{4}', lines[i])
+        if not match or hashlib.sha256(match[1]).hexdigest() != expected_email:
             raise ValueError('Unexpected release identity')
         lines[i] = lines[i][:match.start(1)] + lines[i][match.end(1):]
     return b'\n'.join(lines) + separator + message

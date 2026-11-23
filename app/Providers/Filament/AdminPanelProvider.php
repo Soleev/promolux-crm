@@ -11,6 +11,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -42,6 +43,12 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarWidth('16rem')
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)
+            ->navigationItems([
+                NavigationItem::make('Экран SFP')
+                    ->group('Главная')->icon('heroicon-o-computer-desktop')
+                    ->url(fn () => route('sfp.screen'))
+                    ->visible(fn () => auth()->user()?->active && in_array(auth()->user()->role, ['owner', 'rop', 'manager', 'designer'], true)),
+            ])
             ->navigationGroups(['Главная', 'Продажи', 'Каталог', 'Финансы', 'Управление', 'Справка'])
             ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_BEFORE, fn () => view('filament.header-status'))
             ->userMenuItems([

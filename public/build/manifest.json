@@ -28,7 +28,7 @@
     "src": "_instrument-sans-600-normal-B9e8oLYv.woff"
   },
   "resources/css/app.css": {
-    "file": "assets/app-gzsAD6TU.css",
+    "file": "assets/app-ZE_ahs4m.css",
     "name": "app",
     "names": [
       "app.css"
@@ -45,10 +45,25 @@
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true
   },
+  "resources/css/sfp.css": {
+    "file": "assets/sfp-BJoIDzA_.css",
+    "name": "sfp",
+    "names": [
+      "sfp.css"
+    ],
+    "src": "resources/css/sfp.css",
+    "isEntry": true
+  },
   "resources/js/app.js": {
     "file": "assets/app-BvRk9kiK.js",
     "name": "app",
     "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/sfp.js": {
+    "file": "assets/sfp-DoppFvsa.js",
+    "name": "sfp",
+    "src": "resources/js/sfp.js",
     "isEntry": true
   }
 }

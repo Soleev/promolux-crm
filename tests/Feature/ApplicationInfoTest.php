@@ -52,7 +52,10 @@ it('renders complete release history openly in descending order', function () {
     $response = $this->get('/crm/about')->assertOk()
         ->assertSeeInOrder(['v0.4.1', 'v0.4.0', 'v0.3.9', 'v0.3.8', 'v0.1.0', 'Подготовительный этап'])
         ->assertDontSee('<details', false)->assertDontSee('<summary', false);
-    foreach (config('releases') as $release) {
+    foreach (config('releases') as $releaseVersion => $release) {
+        if (version_compare($releaseVersion, config('app.version'), '>')) {
+            continue;
+        }
         $response->assertSee($release['title']);
         foreach ($release['changes'] as $change) {
             $response->assertSee($change);

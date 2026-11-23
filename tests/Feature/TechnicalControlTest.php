@@ -9,8 +9,11 @@ uses(LazilyRefreshDatabase::class);
 it('shows Technical Control in the existing CRM menu for an active owner', function () {
     $owner = User::factory()->create(['role' => 'owner', 'active' => true]);
 
-    $this->actingAs($owner)->get('/crm/technical-control')->assertOk()
-        ->assertSee('Технический контроль')
+    // Check the actual sidebar on an unrelated page, not the page's own title.
+    $this->actingAs($owner)->get('/crm/orders')->assertOk()
+        ->assertSee('Технический контроль');
+
+    $this->get('/crm/technical-control')->assertOk()
         ->assertSee('Laravel Pulse')
         ->assertSee('Версии программного обеспечения');
 });

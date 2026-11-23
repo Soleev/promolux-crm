@@ -190,3 +190,42 @@ mv -Tf ~/promolux/current.rollback ~/promolux/current
 ```
 Не восстанавливать старую БД поверх новых операций. При повреждении данных
 остановить работы и согласовать отдельное восстановление с сохранением записей.
+
+## Technical Control · owner-only Laravel Pulse (candidate v0.4.3)
+
+This new Technical Control page lives inside the existing Filament CRM panel:
+`/promolux/crm/technical-control`. It is discovered automatically by the
+existing panel. The menu entry is under `Управление`, visible only to the
+active `owner` role. There is no separate tech panel, tech login, tech_admin
+role, password or user migration. The server-side page gate and Pulse's
+`viewPulse` authorization gate independently enforce owner-only access.
+The configured Pulse route is `/promolux/crm/technical/pulse` and uses
+the existing web session. No user information or credentials are shown
+on the technical page.
+
+**Пакет Laravel Pulse v1.11.0 установлен и зафиксирован** в
+`composer.json` / `composer.lock`, опубликованы полные конфигурация и
+официальная миграция. В отдельной тестовой MariaDB 11.4 и SQLite создано
+по три Pulse-таблицы; в изолированной сборке прошло 146 тестов
+(2550 утверждений). Эти результаты не означают, что новая версия
+уже была опубликована на production.
+
+Перед выпуском 0.4.3: проверить доступную Git-историю, свободное место
+и inodes, создать новый комплект резервных копий, выполнить
+`tools/deploy-cpanel.sh prepare` с точным SHA выпуска, отдельно
+применить только Pulse-миграцию в production в окне обслуживания,
+проверить `migrate:status` и `APP_VERSION=0.4.3`, затем
+`tools/deploy-cpanel.sh activate`. Рабочая MariaDB не имеет отношения
+к ранее созданной `soleyev3_pulse043` тестовой базе.
+До открытия сотрудникам проверить вход, владельца, Pulse, 403 для
+остальных ролей, ключевые экраны CRM и журналы.
+
+On isolated staging, run migrations, tests, `route:list`, verify the
+generated Pulse route under the existing `/promolux` prefix, and inspect
+browser assets and 403s for other roles. There is no requirement to run
+`pulse:check` on shared aHost. The Servers card may remain unavailable.
+Use database storage and ingestion, nominal 14-day retention, and monitor
+the real `pulse_*` MariaDB table size. Before production migration, take
+a fresh database + storage backup, review the migration diff, confirm
+inodes/space, and prepare a distinct vetted release. The existing
+`deploy-cpanel.sh` does NOT run migrations automatically.

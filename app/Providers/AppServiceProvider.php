@@ -31,6 +31,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // The existing CRM owner account is the sole Pulse administrator.
+        Gate::define('viewPulse', fn (?User $user): bool => $user?->active === true && $user->role === 'owner');
+
         foreach ([Client::class, Deal::class, Order::class, Task::class, Payment::class, Accrual::class, Payout::class, Expense::class, Activity::class, User::class] as $model) {
             Gate::policy($model, CrmPolicy::class);
         }

@@ -17,6 +17,8 @@ class TechnicalControl extends Page
 
     protected static ?int $navigationSort = 100;
 
+    protected static ?string $slug = 'technical';
+
     protected string $view = 'filament.pages.technical-control';
 
     public static function canAccess(): bool

@@ -2,10 +2,11 @@
     <x-filament::section heading="Laravel Pulse" description="Мониторинг производительности и использования Promolux CRM.">
         @if ($pulseReady)
             <p class="text-sm text-gray-600 dark:text-gray-300">Панель использует твою текущую авторизацию владельца. Отдельный вход не нужен.</p>
-            <a href="{{ route('pulse') }}" target="_blank" rel="noopener noreferrer"
-               class="mt-4 inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500">
-                Открыть Laravel Pulse
-            </a>
+            <div class="mt-4">
+                <x-filament::button tag="a" :href="route('pulse')" target="_blank" color="primary">
+                    Открыть Laravel Pulse
+                </x-filament::button>
+            </div>
         @else
             <p class="text-sm text-gray-600 dark:text-gray-300">
                 Подключение Laravel Pulse ещё не завершено. Для включения необходимы пакет Composer,

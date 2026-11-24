@@ -194,7 +194,7 @@ mv -Tf ~/promolux/current.rollback ~/promolux/current
 ## Technical Control · owner-only Laravel Pulse (candidate v0.4.3)
 
 This new Technical Control page lives inside the existing Filament CRM panel:
-`/promolux/crm/technical-control`. It is discovered automatically by the
+`/promolux/crm/technical`. It is discovered automatically by the
 existing panel. The menu entry is under `Управление`, visible only to the
 active `owner` role. There is no separate tech panel, tech login, tech_admin
 role, password or user migration. The server-side page gate and Pulse's

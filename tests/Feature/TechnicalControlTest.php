@@ -13,19 +13,20 @@ it('shows Technical Control in the existing CRM menu for an active owner', funct
     $this->actingAs($owner)->get('/crm/orders')->assertOk()
         ->assertSee('Технический контроль');
 
-    $this->get('/crm/technical-control')->assertOk()
-        ->assertSee('Laravel Pulse')
+    $this->get('/crm/technical')->assertOk()
+        ->assertSee('Открыть Laravel Pulse')
+        ->assertSee(route('pulse'))
         ->assertSee('Версии программного обеспечения');
 });
 
 it('does not require a second login when owner is already authenticated', function () {
     $owner = User::factory()->create(['role' => 'owner', 'active' => true]);
 
-    $this->actingAs($owner)->get('/crm/technical-control')->assertOk();
+    $this->actingAs($owner)->get('/crm/technical')->assertOk();
 });
 
 it('blocks Technical Control for guests, other roles and inactive owners', function () {
-    $this->get('/crm/technical-control')->assertRedirect('/crm/login');
+    $this->get('/crm/technical')->assertRedirect('/crm/login');
 
     // The /crm root normally redirects. Check a real, authorized business
     // page for every role so a 302 cannot falsely prove that the menu is hidden.
@@ -36,12 +37,12 @@ it('blocks Technical Control for guests, other roles and inactive owners', funct
         'designer' => '/crm/orders',
     ] as $role => $businessPage) {
         $user = User::factory()->create(['role' => $role, 'active' => true]);
-        $this->actingAs($user)->get('/crm/technical-control')->assertForbidden();
+        $this->actingAs($user)->get('/crm/technical')->assertForbidden();
         $this->get($businessPage)->assertOk()->assertDontSee('Технический контроль');
     }
 
     $inactive = User::factory()->create(['role' => 'owner', 'active' => false]);
-    $this->actingAs($inactive)->get('/crm/technical-control')->assertForbidden();
+    $this->actingAs($inactive)->get('/crm/technical')->assertForbidden();
 });
 
 it('restricts Pulse itself to active owners, not just the navigation link', function () {

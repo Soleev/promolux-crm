@@ -29,9 +29,11 @@ class SfpScreenController
     private function screen(Request $request)
     {
         $user = $request->user();
-        abort_unless($user?->active && in_array($user->role, ['owner', 'rop', 'manager', 'designer'], true), 403);
+        abort_unless($user?->active && in_array($user->role, ['owner', 'rop', 'manager', 'designer', 'sfp_screen'], true), 403);
         $today = now('Asia/Tashkent')->toDateString();
-        $base = CrmAccess::query(Order::class, $user)->whereIn('status', ['new', 'design', 'production']);
+        // The dedicated monitor can read the production queue only, never the CRM query scope.
+        $base = ($user->role === 'sfp_screen' ? Order::query() : CrmAccess::query(Order::class, $user))
+            ->whereIn('status', ['new', 'design', 'production']);
         $ordered = fn () => (clone $base)->with(['client:id,name', 'items'])->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderBy('id');
         $mode = $request->query('view') === 'queue' ? 'queue' : 'home';
         $detail = null;

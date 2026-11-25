@@ -19,7 +19,7 @@ class User extends Authenticatable implements FilamentUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    public const ROLE_LABELS = ['owner' => 'Владелец', 'rop' => 'РОП', 'manager' => 'Менеджер', 'cashier' => 'Кассир', 'designer' => 'Дизайнер'];
+    public const ROLE_LABELS = ['owner' => 'Владелец', 'rop' => 'РОП', 'manager' => 'Менеджер', 'cashier' => 'Кассир', 'designer' => 'Дизайнер', 'sfp_screen' => 'Экран SFP'];
 
     public function handlesOwnOrders(): bool
     {

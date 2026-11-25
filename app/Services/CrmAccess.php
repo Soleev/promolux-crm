@@ -29,7 +29,7 @@ class CrmAccess
             return $q;
         }
 
-        if ($user->role === 'cashier') {
+        if (in_array($user->role, ['cashier', 'sfp_screen'], true)) {
             return $q->whereRaw('1 = 0');
         }
 
@@ -67,7 +67,7 @@ class CrmAccess
 
     public static function taskAssignees(User $actor): Builder
     {
-        $users = User::where('active', true);
+        $users = User::where('active', true)->where('role', '!=', 'sfp_screen');
         if (! self::manage($actor, Task::class)) {
             return $users->whereRaw('1 = 0');
         }
@@ -95,6 +95,7 @@ class CrmAccess
                     $eligible->orWhere('id', $record->manager_id);
                 }
             })
+            ->where('role', '!=', 'sfp_screen')
             ->when($actor->handlesOwnOrders(), fn (Builder $query) => $query->whereKey($actor->id));
     }
 
@@ -105,7 +106,7 @@ class CrmAccess
 
     public static function manage(User $user, string $model): bool
     {
-        if (! $user->active) {
+        if (! $user->active || $user->role === 'sfp_screen') {
             return false;
         }
         if ($user->role === 'owner') {

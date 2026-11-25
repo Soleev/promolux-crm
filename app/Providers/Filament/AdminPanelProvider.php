@@ -72,6 +72,7 @@ class AdminPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+		\App\Http\Middleware\RestrictSfpMonitor::class,
                 AuthenticateSession::class,
 
                 ShareErrorsFromSession::class,

@@ -20,7 +20,8 @@ class CatalogLines
         };
         $history = [];
         foreach ($existing as $line) {
-            if ($snapshot = $line['catalog_snapshot'] ?? null) {
+            if ($line['catalog_snapshot'] ?? null) {
+                $snapshot = self::editableSnapshot($line) ?? self::invalid('Сохранение недоступно: позиция содержит неполный снимок каталога.');
                 $history[$snapshot['key']] = $line;
             }
         }
@@ -95,11 +96,24 @@ class CatalogLines
 
     public static function edit(array $row): array
     {
-        $s = $row['catalog_snapshot'] ?? [];
+        $s = self::editableSnapshot($row);
         return ['name' => $row['name'], 'quantity' => $s['copies'] ?? $row['quantity'], 'price' => Money::format($s['rate_minor'] ?? $row['price_minor'])]
-            + ($s ? ['product_id' => $row['product_id'], 'category_id' => $s['category_id'], 'supplier_id' => $s['supplier_id'],
-                'line_key' => $s['key'], 'saved_supplier_id' => $s['supplier_id'], 'saved_supplier_name' => $s['supplier'], 'fields' => $s['fields'], 'area_pricing' => $s['area_pricing'], 'unit' => $s['unit'],
-                'width' => $s['width'] ?? null, 'height' => $s['height'] ?? null, 'characteristics' => $s['characteristics']] : []);
+            + ($s !== null ? ['product_id' => $row['product_id'], 'category_id' => $s['category_id'] ?? null, 'supplier_id' => $s['supplier_id'],
+                'line_key' => $s['key'], 'saved_supplier_id' => $s['supplier_id'], 'saved_supplier_name' => $s['supplier'], 'fields' => $s['fields'], 'area_pricing' => $s['area_pricing'], 'unit' => $s['unit'] ?? null,
+                'width' => $s['width'] ?? null, 'height' => $s['height'] ?? null, 'characteristics' => $s['characteristics'] ?? []] : []);
+    }
+
+    private static function editableSnapshot(array $row): ?array
+    {
+        $snapshot = $row['catalog_snapshot'] ?? null;
+        if (! is_array($snapshot) || empty($row['product_id']) || empty($snapshot['key'])
+            || ! isset($snapshot['supplier_id'], $snapshot['supplier'], $snapshot['area_pricing'])
+            || ! is_array($snapshot['fields'] ?? null)
+            || ($snapshot['area_pricing'] && ! isset($snapshot['copies'], $snapshot['rate_minor'], $snapshot['width'], $snapshot['height']))) {
+            return null;
+        }
+
+        return $snapshot;
     }
 
     private static function invalid(string $message): never

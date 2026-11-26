@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Filament\CrmForms;
+use App\Models\CatalogSupplier;
 use App\Models\Order;
 use App\Services\CrmAccess;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -31,10 +32,12 @@ class SfpScreenController
         $user = $request->user();
         abort_unless($user?->active && in_array($user->role, ['owner', 'rop', 'manager', 'designer', 'sfp_screen'], true), 403);
         $today = now('Asia/Tashkent')->toDateString();
+        $sfpSupplier = CatalogSupplier::query()->where('code', 'sfp')->select('id');
         // The dedicated monitor can read the production queue only, never the CRM query scope.
         $base = ($user->role === 'sfp_screen' ? Order::query() : CrmAccess::query(Order::class, $user))
-            ->whereIn('status', ['new', 'design', 'production']);
-        $ordered = fn () => (clone $base)->with(['client:id,name', 'items'])->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderBy('id');
+            ->whereIn('status', ['new', 'design', 'production'])
+            ->withWhereHas('items', fn ($items) => $items->whereIn('catalog_snapshot->supplier_id', $sfpSupplier));
+        $ordered = fn () => (clone $base)->with('client:id,name')->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderBy('id');
         $mode = $request->query('view') === 'queue' ? 'queue' : 'home';
         $detail = null;
         if ($request->filled('order')) {

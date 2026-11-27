@@ -9,6 +9,7 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -20,6 +21,39 @@ class User extends Authenticatable implements FilamentUser
     use HasFactory, Notifiable;
 
     public const ROLE_LABELS = ['owner' => 'Владелец', 'rop' => 'РОП', 'manager' => 'Менеджер', 'cashier' => 'Кассир', 'designer' => 'Дизайнер', 'sfp_screen' => 'Экран SFP'];
+
+    public function save(array $options = [])
+    {
+        if ($this->exists && ! $this->isDirty('role')) {
+            return parent::save($options);
+        }
+
+        return $this->getConnection()->transaction(function () use ($options): bool {
+            $previous = $this->exists
+                ? $this->newQuery()->whereKey($this->getKey())->lockForUpdate()->value('role')
+                : null;
+            if (! parent::save($options)) {
+                return false;
+            }
+
+            $role = $this->role ?? $this->newQuery()->whereKey($this->getKey())->value('role');
+            if ($role !== $previous) {
+                $this->roleHistory()->create([
+                    'previous_role' => $previous,
+                    'role' => $role,
+                    'changed_by' => auth()->id(),
+                    'recorded_at' => now(),
+                ]);
+            }
+
+            return true;
+        });
+    }
+
+    public function roleHistory(): HasMany
+    {
+        return $this->hasMany(UserRoleHistory::class);
+    }
 
     public function handlesOwnOrders(): bool
     {

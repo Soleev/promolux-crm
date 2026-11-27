@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Accruals;
 
 use App\Filament\Resources\CrmResource;
 use App\Models\Accrual;
+use Illuminate\Database\Eloquent\Builder;
 
 class AccrualResource extends CrmResource
 {
@@ -16,6 +17,11 @@ class AccrualResource extends CrmResource
     protected static string|\UnitEnum|null $navigationGroup = 'Финансы';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-calculator';
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withOutstandingAmounts();
+    }
 
     public static function getPages(): array
     {

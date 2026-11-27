@@ -52,7 +52,7 @@
                     @forelse($tasks as $task)
                         <li wire:key="task-{{ $loop->parent->index }}-{{ $task->id }}">
                             <x-filament::link :href="$details($resources['задачу'], $task->id)">{{ $task->title }}</x-filament::link>
-                            <p @class(['day-late' => $loop->parent->index === 1])>{{ $task->due_at->format('d.m.Y H:i') }} · {{ \App\Filament\CrmForms::taskStatuses()[$task->status] }}</p>
+                            <p @class(['day-late' => $loop->parent->index === 1])>{{ $task->due_at->format('d.m.Y H:i') }} · <x-filament::badge :color="\App\Filament\CrmTableUi::color($task->status)">{{ \App\Filament\CrmForms::taskStatuses()[$task->status] }}</x-filament::badge></p>
                             @foreach([['клиента',$task->client_name,$task->client_id], ['сделку',$task->deal_title,$task->deal_id], ['заказ',$task->visible_order ? 'Заказ № '.$task->visible_order : null,$task->visible_order]] as [$type,$name,$id])
                                 @if($name)<x-filament::link color="gray" :href="$details($resources[$type],$id)">{{ $name }}</x-filament::link>@endif
                             @endforeach
@@ -69,7 +69,7 @@
                     <li>
                         <x-filament::link :href="$details($resources['заказ'],$order->id)">№ {{ $order->id }} · {{ $order->client_name ?? 'Клиент не указан' }} · {{ $order->product ?? 'Без позиций' }}</x-filament::link>
                         <div class="plx-day-order-meta">
-                            <x-filament::badge :color="match ($order->status) { 'ready' => 'success', 'production' => 'warning', 'design' => 'info', default => 'gray' }">{{ \App\Filament\CrmForms::orderStatuses()[$order->status] }}</x-filament::badge>
+                            <x-filament::badge :color="\App\Filament\CrmTableUi::color($order->status)">{{ \App\Filament\CrmForms::orderStatuses()[$order->status] }}</x-filament::badge>
                             <span>Срок производства: {{ $order->due_at?->format('d.m.Y') ?? 'не указан' }}</span>
                         </div>
                         <p>Ответственный: {{ auth()->user()->name }}</p>
@@ -84,7 +84,7 @@
                     @forelse($deals as $deal)
                         <li>
                             <x-filament::link :href="$details($resources['сделку'],$deal->id)">{{ $deal->title }}</x-filament::link>
-                            <p>{{ $deal->client_name ?? 'Клиент не указан' }} · {{ \App\Filament\CrmForms::dealStatuses()[$deal->status] }}</p>
+                            <p>{{ $deal->client_name ?? 'Клиент не указан' }} · <x-filament::badge :color="\App\Filament\CrmTableUi::color($deal->status)">{{ \App\Filament\CrmForms::dealStatuses()[$deal->status] }}</x-filament::badge></p>
                             <p>{{ $deal->action_title }}</p>
                         </li>
                     @empty <li class="plx-empty">Нет сделок с открытыми задачами</li> @endforelse
@@ -97,7 +97,7 @@
                 <ul class="day-list">
                     @foreach($upcoming as $task)
                         <li><x-filament::link :href="$details($resources['задачу'], $task->id)">{{ $task->title }}</x-filament::link>
-                            <p>{{ $task->due_at->format('d.m.Y H:i') }} · {{ \App\Filament\CrmForms::taskStatuses()[$task->status] }}</p></li>
+                            <p>{{ $task->due_at->format('d.m.Y H:i') }} · <x-filament::badge :color="\App\Filament\CrmTableUi::color($task->status)">{{ \App\Filament\CrmForms::taskStatuses()[$task->status] }}</x-filament::badge></p></li>
                     @endforeach
                 </ul>
             </x-filament::section>
@@ -107,7 +107,7 @@
                 <ul class="day-list">
                     @forelse($delegated as $task)
                         <li><x-filament::link :href="$details($resources['задачу'], $task->id)">{{ $task->title }}</x-filament::link>
-                            <p>{{ $task->manager->name }} · {{ \App\Filament\CrmForms::taskStatuses()[$task->status] }} · {{ $task->due_at->format('d.m.Y H:i') }}</p></li>
+                            <p>{{ $task->manager->name }} · <x-filament::badge :color="\App\Filament\CrmTableUi::color($task->status)">{{ \App\Filament\CrmForms::taskStatuses()[$task->status] }}</x-filament::badge> · {{ $task->due_at->format('d.m.Y H:i') }}</p></li>
                     @empty <li class="plx-empty">Поручений дизайнерам пока нет</li> @endforelse
                 </ul>
                 <x-filament::link :href="$resources['задачу']::getUrl('index', ['filters' => ['delegated' => ['isActive' => true]]])">Все мои поручения</x-filament::link>

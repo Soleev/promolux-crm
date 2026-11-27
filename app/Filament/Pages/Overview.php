@@ -48,14 +48,14 @@ class Overview extends Page
     {
         $this->checkFilters();
 
-        if (! $this->from || ! $this->until) {
+        if (! $this->from) {
             return [];
         }
 
         $months = app(MonthlyCharts::class)->build(auth()->user(), $this->from, $this->until, $this->manager ? (int) $this->manager : null, $this->chartInterval);
 
         return auth()->user()->role === 'rop'
-            ? array_map(fn ($row) => array_intersect_key($row, array_flip(['orders', 'payments', 'label'])), $months)
+            ? array_map(fn ($row) => array_intersect_key($row, array_flip(['orders', 'cancelled_orders', 'payments', 'refunds', 'label'])), $months)
             : $months;
     }
 

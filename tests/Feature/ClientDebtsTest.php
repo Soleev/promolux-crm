@@ -29,8 +29,9 @@ it('follows the signed customer balance from collection through handover, full p
     $ledger->payment(array_replace($input, ['amount' => '1.01', 'idempotency_key' => (string) Str::uuid()]));
     $page->call('$refresh')->assertCanNotSeeTableRecords([$order]);
     $ledger->reversePayment($last, 'Проверка сторно оплаты');
+    $page->call('$refresh')->assertSee('6 999 998,99 сум')->assertViewHas('clientCount', 1);
     $order->update(['status' => 'cancelled']);
-    $page->call('$refresh')->assertSee('Отменён')->assertSee('6 999 998,99 сум')->assertViewHas('clientCount', 1);
+    $page->call('$refresh')->assertCanNotSeeTableRecords([$order])->assertViewHas('clientCount', 0);
 });
 
 it('applies current order permissions to debts, filters, search, totals and Livewire requests', function () {

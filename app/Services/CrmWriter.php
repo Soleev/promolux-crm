@@ -32,7 +32,7 @@ class CrmWriter
         $rules = match ($model) {
             Client::class => ['name' => 'required|string|max:255', 'manager_id' => 'nullable|exists:users,id', 'phone' => 'nullable|string|max:100', 'email' => 'nullable|email|max:255', 'source' => 'nullable|string|max:255', 'notes' => 'nullable|string|max:10000', 'contacts' => 'nullable|array', 'contacts.*.name' => 'required|string|max:255', 'contacts.*.phone' => 'nullable|string|max:100', 'contacts.*.email' => 'nullable|email|max:255'],
             Deal::class => ['title' => 'required|string|max:255', 'client_id' => 'required|exists:clients,id', 'manager_id' => 'nullable|exists:users,id', 'status' => ['required', Rule::in(['new', 'qualifying', 'estimate', 'proposal', 'won', 'lost'])], 'currency' => ['required', Rule::in(['UZS'])], 'description' => 'nullable|string|max:10000', 'lost_reason' => 'required_if:status,lost|nullable|string|max:5000'],
-            Order::class => ['number' => ['required', 'string', 'max:100', Rule::unique('orders')->ignore($record?->id)], 'client_id' => 'required|exists:clients,id', 'manager_id' => 'nullable|exists:users,id', 'currency' => ['required', Rule::in(['UZS'])], 'status' => ['required', Rule::in(['new', 'design', 'production', 'ready', 'delivered', 'cancelled'])], 'due_at' => 'nullable|date', 'description' => 'nullable|string|max:10000', 'attachment' => 'nullable|string|max:255'],
+            Order::class => ['number' => ['required', 'string', 'max:100', Rule::unique('orders')->ignore($record?->id)], 'client_id' => 'required|exists:clients,id', 'manager_id' => 'nullable|exists:users,id', 'currency' => ['required', Rule::in(['UZS'])], 'status' => ['required', Rule::in(['new', 'design', 'production', 'ready', 'delivered'])], 'due_at' => 'nullable|date', 'description' => 'nullable|string|max:10000', 'attachment' => 'nullable|string|max:255'],
             Expense::class => ['paid_at' => 'required|date', 'category' => 'required|string|max:255', 'amount' => 'required|string', 'currency' => ['required', Rule::in(['UZS'])], 'payer' => ['required', Rule::in(['SFP', 'Promolux'])], 'order_id' => 'nullable|exists:orders,id', 'notes' => 'nullable|string|max:10000'],
             User::class => ['name' => 'required|string|max:255', 'email' => ['required', 'email', Rule::unique('users')->ignore($record?->id)], 'password' => [$record ? 'nullable' : 'required', 'string', 'min:12'], 'role' => ['required', Rule::in(array_keys(User::ROLE_LABELS))], 'active' => 'required|boolean'],
             default => abort(403),
@@ -89,6 +89,7 @@ class CrmWriter
         }
 
         return DB::transaction(function () use ($model, $record, $data) {
+            $creating = $record === null;
             $items = $data['items'] ?? null;
             unset($data['items']);
             if ($record && in_array($model, [Order::class, Deal::class], true)) {
@@ -101,6 +102,9 @@ class CrmWriter
                 $items = CatalogLines::normalize($items, $record);
             }
             if ($model === Order::class && $record) {
+                if ($record->status === 'delivered' && $data['status'] !== 'delivered') {
+                    throw ValidationException::withMessages(['data.status' => 'Статус выданного заказа зафиксирован.']);
+                }
                 if (($record->payments()->exists() || $record->cashReceipts()->exists()) && ($data['currency'] !== $record->currency || $data['client_id'] != $record->client_id)) {
                     throw ValidationException::withMessages(['data.currency' => 'После оплаты нельзя менять валюту и клиента заказа.']);
                 }
@@ -116,6 +120,9 @@ class CrmWriter
             }
             $record ??= new $model;
             $record->fill($data)->save();
+            if ($creating && $record instanceof Order) {
+                app(FinancialTerms::class)->capture($record);
+            }
             if ($model === Order::class && $items !== null) {
                 $record->recordActivity('items_replaced', ['before' => $record->items()->get()->toArray(), 'after' => $items]);
                 $record->items()->delete();
@@ -142,6 +149,7 @@ class CrmWriter
                 return $deal->order;
             }
             $order = Order::create(['number' => 'PL-'.strtoupper((string) Str::ulid()), 'client_id' => $deal->client_id, 'deal_id' => $deal->id, 'manager_id' => $deal->manager_id, 'currency' => $deal->currency, 'status' => 'new', 'description' => $deal->description]);
+            app(FinancialTerms::class)->capture($order);
             $order->items()->createMany($deal->items ?? []);
             $deal->recordActivity('converted', ['order_id' => $order->id]);
 

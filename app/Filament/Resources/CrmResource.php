@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\CrmForms;
 use App\Filament\CrmTableUi;
+use App\Filament\OrderCancellationActions;
 use App\Models\Accrual;
 use App\Models\Activity;
 use App\Models\Client;
@@ -104,7 +105,7 @@ abstract class CrmResource extends Resource
             Order::class => Orders\OrderResource::orderColumns($text),
             Task::class => [$text('title', 'Задача'), $text('manager.name', 'Ответственный'), TextColumn::make('due_at')->label('Срок')->dateTime('d.m.Y H:i')->sortable()->badge()->color(fn ($record) => $record->due_at->isPast() && ! in_array($record->status, ['done', 'cancelled']) ? 'danger' : null), $text('status', 'Статус')->formatStateUsing(fn ($state) => CrmForms::taskStatuses()[$state] ?? $state)->badge()->color(fn ($state) => CrmTableUi::color($state))],
             Payment::class => [$text('order.number', 'Заказ'), TextColumn::make('paid_at')->label('Дата оплаты')->date('d.m.Y')->sortable(), $money('amount_minor', 'Оплачено SFP'), TextColumn::make('method')->label('Способ оплаты')->searchable(), $text('currency', 'Валюта'), $text('manager.name', 'Менеджер'), TextColumn::make('calculation_status')->label('Расчёт')->formatStateUsing(fn ($state) => $state === 'calculated' ? 'Начислено' : 'Требует уточнения')->badge()->color(fn ($state) => CrmTableUi::color($state)), TextColumn::make('reversal_of')->label('Сторно оплаты №')],
-            Accrual::class => [TextColumn::make('id')->label('№'), $text('payment.order.number', 'Заказ'), TextColumn::make('payment.paid_at')->label('Дата оплаты')->date('d.m.Y')->sortable(), $text('beneficiary.name', 'Получатель'), $text('kind', 'Начисление')->formatStateUsing(fn ($state) => CrmForms::kindLabels()[$state] ?? $state), $money('amount_minor', 'Начислено'), $money('outstanding_minor', 'Остаток'), $text('currency', 'Валюта')],
+            Accrual::class => [TextColumn::make('id')->label('№'), $text('payment.order.number', 'Заказ'), TextColumn::make('payment.paid_at')->label('Дата оплаты')->date('d.m.Y')->sortable(), $text('beneficiary.name', 'Получатель'), $text('kind', 'Начисление')->formatStateUsing(fn (Accrual $record) => CrmForms::accrualLabel($record)), $money('amount_minor', 'Начислено'), $money('outstanding_minor', 'Остаток'), $text('currency', 'Валюта')],
             Payout::class => [TextColumn::make('id')->label('№'), TextColumn::make('paid_at')->label('Дата')->date('d.m.Y')->sortable(), $text('payer', 'Плательщик'), $text('recipient.name', 'Фактический получатель'), $money('amount_minor', 'Выплачено'), $text('currency', 'Валюта'), TextColumn::make('reversal_of')->label('Сторно выплаты №')],
             Expense::class => [TextColumn::make('paid_at')->label('Дата')->date('d.m.Y')->sortable(), $text('category', 'Категория'), $text('payer', 'Плательщик'), $money('amount_minor', 'Расход'), $text('currency', 'Валюта'), $text('order.number', 'Заказ')],
             User::class => [$text('name', 'Сотрудник'), $text('email', 'Email'), $text('role', 'Роль')->formatStateUsing(fn ($state) => User::ROLE_LABELS[$state] ?? $state), TextColumn::make('active')->label('Доступ')->badge()->color(fn ($state) => $state ? 'success' : 'gray')->formatStateUsing(fn ($state) => $state ? 'Разрешён' : 'Отключён')],
@@ -114,7 +115,7 @@ abstract class CrmResource extends Resource
             $columns = array_values(array_filter($columns, fn ($column) => ! $column instanceof TextColumn || ! in_array($column->getName(), ['kind', 'payer', 'calculation_status', 'payment.order.number'], true)));
         }
         $actions = [
-            Action::make('details')->label('Подробнее')->modalHeading('Карточка записи')->modalSubmitAction(false)
+            Action::make('details')->label('Подробнее')->modalHeading('Карточка записи')->modalSubmitAction(false)->modalCancelActionLabel('Закрыть')
                 ->modalContent(function (Model $record) {
                     Gate::authorize('view', $record);
 
@@ -124,7 +125,8 @@ abstract class CrmResource extends Resource
                 ->when($model === Order::class,
                     // Table records are already scoped. Recheck the policy when opening the form;
                     // CrmWriter also authorizes the record when saving.
-                    fn (EditAction $action) => $action->authorize(fn () => CrmAccess::manage(auth()->user(), Order::class))
+                    fn (EditAction $action) => $action->hidden(fn (Order $record): bool => $record->status === 'cancelled')
+                        ->authorize(fn () => CrmAccess::manage(auth()->user(), Order::class))
                         ->beforeFormFilled(fn (Order $record) => Gate::authorize('update', $record)),
                     fn (EditAction $action) => $action->visible(fn (Model $record) => static::canEdit($record)),
                 )
@@ -210,6 +212,8 @@ abstract class CrmResource extends Resource
         if ($model === Order::class) {
             $actions[0]->icon('heroicon-o-eye');
             $actions[1]->icon('heroicon-o-pencil-square');
+            $actions[] = OrderCancellationActions::cancel();
+            $actions[] = OrderCancellationActions::restore();
             $actions = [ActionGroup::make($actions)->label('Действия')->icon('heroicon-m-ellipsis-vertical')];
         }
         $table->columns($columns)->filters($filters)->recordActions($actions)->defaultSort('id', 'desc')->recordUrl(null);

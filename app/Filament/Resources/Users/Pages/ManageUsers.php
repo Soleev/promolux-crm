@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Pages;
 
+use App\Filament\FinancialTermsActions;
 use App\Filament\Resources\Users\UserResource;
 use Filament\Resources\Pages\ManageRecords;
 
@@ -11,6 +12,6 @@ class ManageUsers extends ManageRecords
 
     protected function getHeaderActions(): array
     {
-        return [static::getResource()::createAction()];
+        return [static::getResource()::createAction(), FinancialTermsActions::standardAgreement()];
     }
 }

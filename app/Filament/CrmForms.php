@@ -94,7 +94,11 @@ class CrmForms
             Order::class => [
                 TextInput::make('number')->label('Номер заказа')->default(fn () => 'PL-'.strtoupper((string) Str::ulid()))->required(),
                 self::saleClient(), self::manager(),
-                Select::make('status')->label('Производственный статус')->options(self::orderStatuses())->default('new')->required(),
+                Select::make('status')->label('Производственный статус')
+                    ->options(fn (?Order $record): array => $record?->status === 'delivered'
+                        ? ['delivered' => self::orderStatuses()['delivered']]
+                        : array_diff_key(self::orderStatuses(), ['cancelled' => true]))
+                    ->default('new')->required(),
                 DatePicker::make('due_at')->native(false)->displayFormat('d.m.Y')->label('Срок'), Textarea::make('description')->label('Описание'), self::upload('attachment'), self::items(),
             ],
             Task::class => [
@@ -109,8 +113,6 @@ class CrmForms
                 OrderSelect::make(true),
                 DatePicker::make('paid_at')->native(false)->displayFormat('d.m.Y')->label('Дата оплаты в SFP')->default(today())->maxDate(today())->required(),
                 self::money(),
-                Select::make('owner_id')->hidden(fn () => auth()->user()->role === 'designer')->label('Получатель доли владельца')->options(fn () => User::where('role', 'owner')->where('active', true)->pluck('name', 'id'))->default(fn () => auth()->id()),
-                Select::make('rop_id')->hidden(fn () => auth()->user()->role === 'designer')->label('Получатель доли РОП')->options(fn () => User::where('role', 'rop')->where('active', true)->pluck('name', 'id'))->helperText('Для заказа с менеджером обязательны оба получателя.'),
                 self::upload('document'), $notes(),
             ],
             Payout::class => [
@@ -119,7 +121,11 @@ class CrmForms
                 self::relation('recipient_id', User::class, 'Фактический получатель', 'name', true),
                 DatePicker::make('paid_at')->native(false)->displayFormat('d.m.Y')->label('Дата выплаты')->default(today())->maxDate(today())->required(), self::money(),
                 Repeater::make('allocations')->label('Распределение по начислениям')->schema([
-                    Select::make('accrual_id')->label('Начисление')->options(fn () => Accrual::with(['beneficiary', 'payment.order'])->where('amount_minor', '>', 0)->get()->filter(fn ($a) => $a->outstanding_minor > 0 && ! Payment::where('reversal_of', $a->payment_id)->exists())->mapWithKeys(fn ($a) => [$a->id => '#'.$a->id.' · '.$a->payment->order->number.' · '.$a->beneficiary->name.' · '.self::kindLabels()[$a->kind].' · остаток '.Money::display($a->outstanding_minor)]))->searchable()->required(),
+                    Select::make('accrual_id')->label('Начисление')->options(fn () => Accrual::with(['beneficiary', 'payment.order'])
+                        ->withOutstandingAmounts()->where('amount_minor', '>', 0)
+                        ->whereNotIn('payment_id', Payment::query()->whereNotNull('reversal_of')->select('reversal_of'))
+                        ->get()->filter(fn ($a) => $a->outstanding_minor > 0)
+                        ->mapWithKeys(fn ($a) => [$a->id => '#'.$a->id.' · '.$a->payment->order->number.' · '.$a->beneficiary->name.' · '.self::accrualLabel($a).' · остаток '.Money::display($a->outstanding_minor)]))->searchable()->required(),
                     self::money(),
                 ])->minItems(1)->defaultItems(1)->columnSpanFull(), $notes(),
             ],
@@ -161,7 +167,24 @@ class CrmForms
 
     public static function kindLabels(): array
     {
-        return ['owner_gross' => 'Владельцу от SFP · 5%', 'rop_gross' => 'РОП от SFP · 5%', 'manager_owner' => 'Менеджеру из доли владельца · 2,5%', 'manager_rop' => 'Менеджеру из доли РОП · 2,5%'];
+        return ['owner_gross' => 'Владельцу от SFP', 'rop_gross' => 'РОП от SFP', 'manager_owner' => 'Сотруднику из доли владельца', 'manager_rop' => 'Сотруднику из доли РОП'];
+    }
+
+    public static function rateLabel(?int $basisPoints): string
+    {
+        if ($basisPoints === null) {
+            return 'Не подтверждена';
+        }
+
+        $fraction = rtrim(str_pad((string) ($basisPoints % 100), 2, '0', STR_PAD_LEFT), '0');
+
+        return intdiv($basisPoints, 100).($fraction === '' ? '' : ','.$fraction).'%';
+    }
+
+    public static function accrualLabel(Accrual $accrual): string
+    {
+        // The posted accrual stores the rate used then; never infer it from today's agreement.
+        return (self::kindLabels()[$accrual->kind] ?? $accrual->kind).' · '.self::rateLabel($accrual->rate_bps);
     }
 
     public static function editData(array $data, Model $record): array

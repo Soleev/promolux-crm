@@ -14,14 +14,16 @@
     $width = max(500, 70 + 72 * count($months));
     $step = ($width - 70) / count($months);
     $x = fn ($index) => 62 + $step * ($index + 0.5);
-    $colors = ['#6366f1', '#0d9488', '#d97706'];
+    $colors = ['#6366f1', '#0d9488', '#d97706', '#be185d'];
     $amount = fn ($value) => \App\Services\Money::display($value);
+    $bars = array_keys(array_diff_key($series, ['balance' => true]));
+    $barStep = min(18, 65 / count($bars));
     $points = isset($series['balance']) ? implode(' ', array_map(fn ($index) => $x($index).','.$y($months[$index]['balance']), array_keys($months))) : '';
 @endphp
 <x-filament::section :heading="$heading">
     <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        @foreach(array_values($series) as $index => $label)
-            <span><span aria-hidden="true" style="color:{{ $colors[$index] }}">{{ $index === 2 ? '━' : '■' }}</span> {{ $label }}</span>
+        @foreach($series as $key => $label)
+            <span><span aria-hidden="true" style="color:{{ $colors[$loop->index] }}">{{ $key === 'balance' ? '━' : '■' }}</span> {{ $label }}</span>
         @endforeach
     </div>
     <div class="min-w-0 overflow-x-auto"><svg style="min-width: {{ count($months) > 6 ? $width : 0 }}px" viewBox="0 0 {{ $width }} 183" class="mt-3 w-full" role="img" aria-label="{{ $heading }}, {{ $currency }}. Точные суммы приведены в таблице ниже.">
@@ -30,8 +32,8 @@
             <text x="58" y="{{ $y($tick) + 4 }}" text-anchor="end" fill="currentColor" font-size="10">{{ \Illuminate\Support\Number::abbreviate($tick / 100, precision: 1) }}</text>
         @endforeach
         @foreach($months as $index => $month)
-            @foreach(array_slice(array_keys($series), 0, 2) as $i => $key)
-                <rect x="{{ $x($index) - 17 + 18 * $i }}" y="{{ min($zero, $y($month[$key])) }}" width="15" height="{{ abs($zero - $y($month[$key])) }}" rx="2" fill="{{ $colors[$i] }}">
+            @foreach($bars as $i => $key)
+                <rect x="{{ $x($index) + ($i - count($bars) / 2) * $barStep }}" y="{{ min($zero, $y($month[$key])) }}" width="{{ $barStep - 3 }}" height="{{ abs($zero - $y($month[$key])) }}" rx="2" fill="{{ $colors[$i] }}">
                     <title>{{ $month['label'] }} · {{ $series[$key] }} · {{ $amount($month[$key]) }}</title>
                 </rect>
             @endforeach

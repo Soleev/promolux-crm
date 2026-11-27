@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\FinancialTermsActions;
 use App\Filament\Resources\Clients\ClientResource;
 use App\Filament\Resources\Deals\DealResource;
 use App\Filament\Resources\Orders\OrderResource;
@@ -32,6 +33,11 @@ class MyDay extends Page
     public static function canAccess(): bool
     {
         return About::canAccess() && TaskResource::canViewAny();
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [FinancialTermsActions::myAgreement()];
     }
 
     public function complete(int $id): void

@@ -1,13 +1,17 @@
 @php
     $order ??= $getRecord();
     $total = $order->total_minor;
-    $paid = $order->paid_minor;
-    $balance = $total - $paid;
+    $showRefunds = \App\Services\RefundAccess::canViewAny(auth()->user());
+    $paid = $showRefunds ? $order->net_paid_minor : $order->paid_minor;
+    $balance = $order->status === 'cancelled' ? 0 : $total - $paid;
+    $summary = ['Стоимость' => $total, 'Получено от клиента' => $order->paid_minor];
+    if ($showRefunds) $summary['Возвращено клиенту'] = $order->returned_minor;
+    $summary['Осталось получить'] = max(0, $balance);
     $percent = $total > 0 ? \Brick\Math\BigDecimal::of($paid)->multipliedBy(100)->dividedBy($total, 1, \Brick\Math\RoundingMode::HalfUp) : null;
 @endphp
 <div class="min-w-0 space-y-1 py-2 text-sm tabular-nums" data-order-payment="{{ $order->id }}">
     <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        @foreach(['Стоимость' => $total, 'Получено от клиента' => $paid, 'Осталось получить' => max(0, $balance)] as $label => $value)
+        @foreach($summary as $label => $value)
             <dt class="text-gray-600 dark:text-gray-400">{{ $label }}</dt>
             <dd @class(['text-end', 'font-bold' => ($emphasizeDebt ?? false) && $label === 'Осталось получить', 'font-medium' => !($emphasizeDebt ?? false) || $label !== 'Осталось получить'])>{{ $order->displayAmount($value) }}</dd>
         @endforeach
@@ -24,7 +28,8 @@
         @endif
     </dl>
     <div class="flex flex-wrap justify-between gap-x-3">
-        <span>{{ $order->payment_status }}</span>
+        <x-filament::badge :color="\App\Filament\CrmTableUi::color($order->paymentStatusFor($paid))">{{ $order->paymentStatusFor($paid) }}</x-filament::badge>
+        @if($showRefunds && $order->refund_status)<x-filament::badge :color="\App\Filament\CrmTableUi::color($order->refund_status)">{{ $order->refund_status }}</x-filament::badge>@endif
         <span>Оплачено: {{ $percent === null ? '—' : str_replace('.', ',', (string) $percent).'%' }}</span>
     </div>
     @if($percent !== null)

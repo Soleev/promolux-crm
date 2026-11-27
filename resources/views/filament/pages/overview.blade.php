@@ -7,13 +7,19 @@
     <div class="grid gap-4 rounded-xl bg-white p-4 shadow-sm md:grid-cols-4 dark:bg-gray-900">
         <div class="md:col-span-3">{{ $this->filtersForm }}</div>
         @if(auth()->user()->role === 'owner')
-        <div class="flex items-end"><x-filament::button tag="a" :href="route('crm.export', ['from'=>$from,'until'=>$until,'manager'=>$manager])" icon="heroicon-o-arrow-down-tray">Скачать реестр CSV</x-filament::button></div>
+        <div class="flex flex-wrap items-end gap-2">
+            <x-filament::button tag="a" :href="route('crm.export', ['from'=>$from,'until'=>$until,'manager'=>$manager])" icon="heroicon-o-arrow-down-tray">Скачать реестр CSV</x-filament::button>
+            <x-filament::button tag="a" :href="route('crm.export', ['type'=>'refunds','from'=>$from,'until'=>$until,'manager'=>$manager])" icon="heroicon-o-arrow-down-tray">Скачать возвраты CSV</x-filament::button>
+        </div>
         @endif
     </div>
     @error('until')<p class="text-red-600">{{ $message }}</p>@enderror
+    @if($manager && auth()->user()->role === 'owner')
+        <p class="text-sm text-gray-500">Частичный баланс: непривязанные погашения и списания исключены фильтром менеджера.</p>
+    @endif
     @include('filament.financial-summary')
-    <div class="grid gap-4 md:grid-cols-3">
-        @foreach(['orders'=>'Всего заказов','active_orders'=>'Активные заказы','overdue_tasks'=>'Просроченные задачи'] as $key=>$label)
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @foreach(['orders'=>'Всего заказов','active_orders'=>'Активные заказы','cancelled_orders'=>'Отменённые заказы','overdue_tasks'=>'Просроченные задачи'] as $key=>$label)
         <x-filament::section><p class="text-sm text-gray-500 dark:text-gray-400">{{ $label }}</p><p class="mt-2 text-3xl font-semibold">{{ $this->report[$key] }}</p></x-filament::section>
         @endforeach
     </div>
@@ -36,29 +42,29 @@
     </div>
     @if($this->chartMonths)
     <div class="grid gap-6 xl:grid-cols-2">
-        @include('filament.monthly-chart', ['heading'=>'Заказы и оплаты клиентов', 'months'=>$this->chartMonths, 'currency'=>'сум', 'series'=>['orders'=>'Стоимость заказов', 'payments'=>'Клиенты оплатили в SFP']])
+        @include('filament.monthly-chart', ['heading'=>'Заказы и оплаты клиентов', 'months'=>$this->chartMonths, 'currency'=>'сум', 'series'=>['orders'=>'Действующие и выданные заказы', 'payments'=>'Клиенты оплатили в SFP', 'cancelled_orders'=>'Отменённые заказы', 'refunds'=>'Возвраты клиентам']])
         @if(auth()->user()->role !== 'rop')
-        @include('filament.monthly-chart', ['heading'=>match(auth()->user()->role){'manager'=>'Моё вознаграждение', 'rop'=>'Мои расчёты с SFP', default=>'Расчёты с SFP'}, 'months'=>$this->chartMonths, 'currency'=>'сум', 'series'=>['earned'=>'Начислено', 'paid'=>'Погашено', 'balance'=>'Остаток на конец периода']])
+        @include('filament.monthly-chart', ['heading'=>match(auth()->user()->role){'manager'=>'Моё вознаграждение', 'rop'=>'Мои расчёты с SFP', default=>'Расчёты с SFP'}, 'months'=>$this->chartMonths, 'currency'=>'сум', 'series'=>['earned'=>'Начислено за вычетом сторно', 'paid'=>'Выплачено', 'balance'=>'Остаток на конец периода']])
         @endif
     </div>
-    <p class="text-xs text-gray-500 dark:text-gray-400">Заказы показаны по дате оформления, оплаты и выплаты — по дате поступления. Остаток учитывает долг до начала периода.</p>
+    <p class="text-xs text-gray-500 dark:text-gray-400">Заказы показаны по дате оформления и текущему статусу. Оплаты, выплаты, возвраты и сторно отражаются по фактическим датам. Остаток учитывает долг до начала периода.</p>
     @else
-    <p>Выберите обе даты для построения графиков.</p>
+    <p>Выберите начальную дату для построения графиков. Без конечной даты данные показаны по сегодня.</p>
     @endif
     @if(auth()->user()->role === 'owner')
     <x-filament::section heading="Реестр начислений и сверка">
-        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Начисления по оплатам выбранного периода. Выплаты и остатки — по выбранную конечную дату. Полный реестр доступен в CSV.</p>
+        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Остатки на начало и конец периода; движения — по фактическим датам. Начисления включают знаковые сторно оплат, выплаты — сторно выплат. Погашения и списания показаны отдельно. Все суммы в UZS. Полный реестр доступен в CSV.</p>
         <div class="overflow-x-auto">
         <table class="w-full text-left text-sm"><thead><tr class="border-b border-gray-200 dark:border-gray-700">
-            @foreach(['Месяц','Заказ / оплата','Получатель','Начисление','Валюта','Начислено','Погашено','Остаток'] as $title)<th class="px-3 py-3 font-medium">{{ $title }}</th>@endforeach
+            @foreach(['Месяц','Заказ / оплата','Получатель','Начисление','Плательщик','На начало','Начислено','Выплачено','Сторно возвратов','Погашение долга','Списание долга','На конец'] as $title)<th class="px-3 py-3 font-medium">{{ $title }}</th>@endforeach
         </tr></thead><tbody>
         @forelse($this->register->take(50) as $row)
             <tr class="border-b border-gray-100 dark:border-gray-800">
-                <td class="px-3 py-3">{{ $row['month'] }}</td><td class="px-3 py-3">{{ $row['order'] }} / #{{ $row['payment_id'] }}</td><td class="px-3 py-3">{{ $row['beneficiary'] }}</td><td class="px-3 py-3">{{ $row['kind'] }}</td><td class="px-3 py-3">{{ $row['currency'] }}</td>
-                @foreach(['accrued','paid','remaining'] as $key)<td class="whitespace-nowrap px-3 py-3 tabular-nums">{{ \App\Services\Money::display($row[$key]) }}</td>@endforeach
+                <td class="px-3 py-3">{{ $row['month'] }}</td><td class="px-3 py-3">{{ $row['order'] }} / #{{ $row['payment_id'] }}</td><td class="px-3 py-3">{{ $row['beneficiary'] }}</td><td class="px-3 py-3">{{ $row['kind'] }}</td><td class="px-3 py-3">{{ $row['payer'] }}</td>
+                @foreach(['opening','accrued','paid','storno','repaid','written_off','remaining'] as $key)<td class="whitespace-nowrap px-3 py-3 tabular-nums">{{ \App\Services\Money::display($row[$key]) }}</td>@endforeach
             </tr>
         @empty
-            <tr><td colspan="8" class="py-8 text-center text-gray-500">Начислений за этот период нет.</td></tr>
+            <tr><td colspan="12" class="py-8 text-center text-gray-500">Начислений за этот период нет.</td></tr>
         @endforelse
         </tbody></table>
         </div>

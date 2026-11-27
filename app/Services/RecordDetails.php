@@ -27,7 +27,10 @@ class RecordDetails
                 'history' => ActivityHistory::journal(collect([$record->loadMissing('actor:id,name')]))];
         }
         $owner = auth()->user()->role === 'owner';
-        $attributes = collect($record->getAttributes())->except(['password', 'remember_token', 'idempotency_key', 'attachment', 'document', 'ordered_minor', 'confirmed_minor', 'pending_minor'])->all();
+        $attributes = collect($record->getAttributes())->except([
+            'password', 'remember_token', 'idempotency_key', 'attachment', 'document', 'ordered_minor', 'confirmed_minor',
+            'pending_minor', 'returned_minor', 'approved_refund_minor', 'has_blocking_refunds', 'allocated_minor', 'refund_reversed_minor',
+        ])->all();
         if (! $owner) {
             foreach (['kind', 'payer', 'rate_bps', 'calculation_status'] as $privateField) {
                 unset($attributes[$privateField]);
@@ -60,7 +63,10 @@ class RecordDetails
             $attributes['calculation_status'] = ['calculated' => 'Начислено', 'needs_clarification' => 'Требует уточнения'][$attributes['calculation_status']] ?? $attributes['calculation_status'];
         }
         if (isset($attributes['kind'])) {
-            $attributes['kind'] = CrmForms::kindLabels()[$attributes['kind']] ?? $attributes['kind'];
+            $attributes['kind'] = $record instanceof Accrual ? CrmForms::accrualLabel($record) : (CrmForms::kindLabels()[$attributes['kind']] ?? $attributes['kind']);
+        }
+        if ($owner && $record instanceof Accrual) {
+            $attributes['rate_bps'] = CrmForms::rateLabel($record->rate_bps);
         }
         if ($record instanceof Task) {
             unset($attributes['manager_id'], $attributes['created_by']);
@@ -95,6 +101,9 @@ class RecordDetails
             $details['balanceOrder'] = CrmAccess::query(Order::class)->withPaymentTotals()->findOrFail($record->id);
             $details['payments'] = CrmAccess::query(Payment::class)->where('order_id', $record->id)->where('currency', $record->currency)->latest('paid_at')->latest('id')->get();
             $details['pendingCash'] = CashReceiptResource::getEloquentQuery()->withoutEagerLoads()->where('order_id', $record->id)->where('status', 'pending')->latest('collected_at')->get();
+            if ($details['balanceOrder']->status === 'cancelled') {
+                $details['cancellation'] = $details['balanceOrder']->currentCancellation;
+            }
         }
         if ($record instanceof Client) {
             if (isset($attributes['contacts'])) {

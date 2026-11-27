@@ -70,14 +70,6 @@ class CashReceiptResource extends Resource
 
     public static function collectionAction(): Action
     {
-        $recipient = fn (string $role, string $label) => Select::make($role.'_id')->label($label)->hidden(fn () => auth()->user()->role === 'designer')
-            ->options(fn () => User::where('role', $role)->where('active', true)->pluck('name', 'id'))
-            ->default(function () use ($role) {
-                $ids = User::where('role', $role)->where('active', true)->limit(2)->pluck('id');
-
-                return $ids->count() === 1 ? $ids->first() : null;
-            });
-
         return Action::make('collect')->label('Записать наличные от клиента')->visible(fn () => in_array(auth()->user()->role, ['owner', 'rop', 'manager', 'designer'], true))
             ->schema([
                 Hidden::make('idempotency_key')->default(fn () => (string) Str::uuid()),
@@ -86,7 +78,6 @@ class CashReceiptResource extends Resource
                 DatePicker::make('collected_at')->native(false)->displayFormat('d.m.Y')->label('Дата получения от клиента')->default(today())->maxDate(today())->required(),
                 Select::make('collector_id')->label('Кто принял у клиента')->visible(fn () => auth()->user()->role === 'owner')
                     ->options(fn () => User::where('active', true)->whereIn('role', ['owner', 'rop', 'manager', 'designer'])->pluck('name', 'id'))->default(fn () => auth()->id())->required(),
-                $recipient('owner', 'Владелец'), $recipient('rop', 'Руководитель отдела продаж'),
             ])->action(fn (array $data) => app(CashDesk::class)->collect($data));
     }
 

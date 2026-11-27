@@ -17,7 +17,7 @@ class CashDesk
         abort_unless($actor?->active && in_array($actor->role, ['owner', 'rop', 'manager', 'designer'], true), 403);
         $data = Validator::make($input, [
             'order_id' => 'required|integer', 'idempotency_key' => 'required|uuid', 'amount' => 'required|string',
-            'collector_id' => 'nullable|integer', 'owner_id' => 'nullable|integer', 'rop_id' => 'nullable|integer', 'collected_at' => 'required|date_format:Y-m-d|before_or_equal:today',
+            'collector_id' => 'nullable|integer', 'collected_at' => 'required|date_format:Y-m-d|before_or_equal:today',
         ])->validate();
         $amount = Money::parse($data['amount']);
         if ($amount <= 0) {
@@ -34,17 +34,26 @@ class CashDesk
                 return $existing;
             }
             abort_unless(User::whereKey($collector)->where('active', true)->whereIn('role', ['owner', 'rop', 'manager', 'designer'])->exists(), 422);
-            $managed = $order->manager?->role === 'manager';
-            $recipients = [];
-            foreach (['owner', 'rop'] as $role) {
-                $id = $data[$role.'_id'] ?? null;
-                if ($managed && ! User::whereKey($id)->where('active', true)->where('role', $role)->exists()) {
-                    throw ValidationException::withMessages([$role.'_id' => 'Выберите получателя начисления.']);
-                }
-                $recipients[$role.'_id'] = $managed ? $id : null;
-            }
+            if ($order->status === 'cancelled') {
+    throw ValidationException::withMessages([
+        'amount' => 'Нельзя принимать оплату по отменённому заказу.',
+    ]);
+}
+            $terms = $order->financialTerms;
 
-            return CashReceipt::create($recipients + ['order_id' => $order->id, 'manager_id' => $order->manager_id, 'managed_sale' => $managed, 'collector_id' => $collector, 'amount_minor' => $amount, 'collected_at' => $data['collected_at'], 'idempotency_key' => $data['idempotency_key'], 'status' => 'pending']);
+            return CashReceipt::create([
+                'order_id' => $order->id,
+                'order_financial_terms_id' => $terms?->id,
+                'manager_id' => $terms?->seller_id ?? $order->initial_seller_id ?? $order->manager_id,
+                'managed_sale' => $terms?->seller_role === 'manager',
+                'owner_id' => $terms?->owner_id,
+                'rop_id' => $terms?->rop_id,
+                'collector_id' => $collector,
+                'amount_minor' => $amount,
+                'collected_at' => $data['collected_at'],
+                'idempotency_key' => $data['idempotency_key'],
+                'status' => 'pending',
+            ]);
         }, 3);
     }
 

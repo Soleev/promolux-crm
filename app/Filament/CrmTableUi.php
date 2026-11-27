@@ -60,11 +60,12 @@ class CrmTableUi
     public static function color(?string $state): string
     {
         return match ($state) {
-            'won', 'ready', 'delivered', 'done', 'calculated', 'accepted', 'Оплачен' => 'success',
-            'lost', 'cancelled', 'reversed' => 'gray',
-            'production', 'in_progress', 'proposal', 'Частично оплачен' => 'info',
-            'needs_clarification', 'pending', 'Не оплачен', 'Переплата' => 'warning',
-            default => 'primary',
+            'won', 'ready', 'delivered', 'done', 'calculated', 'accepted', 'completed', 'Оплачен', 'Полный возврат' => 'success',
+            'lost', 'cancelled', 'reversed', 'rejected', 'error', 'overdue' => 'danger',
+            'qualifying', 'design', 'production', 'in_progress' => 'info',
+            'estimate', 'approved', 'needs_clarification', 'pending', 'Не оплачен', 'Частично оплачен', 'Переплата', 'Частичный возврат', 'due_today' => 'warning',
+            'proposal' => 'primary',
+            default => 'gray',
         };
     }
 

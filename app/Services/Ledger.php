@@ -5,8 +5,11 @@ namespace App\Services;
 use App\Models\Accrual;
 use App\Models\CashReceipt;
 use App\Models\Order;
+use App\Models\OrderFinancialTerms;
 use App\Models\Payment;
 use App\Models\Payout;
+use App\Models\Refund;
+use App\Models\RefundAllocation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -40,6 +43,7 @@ class Ledger
         abort_unless($actor?->active && $actor->role === 'cashier', 403);
 
         return DB::transaction(function () use ($receipt, $date, $actor) {
+            Order::query()->lockForUpdate()->findOrFail($receipt->order_id);
             $cash = CashReceipt::lockForUpdate()->findOrFail($receipt->id);
             if ($cash->status === 'accepted' && $cash->cashier_id === $actor->id) {
                 return Payment::findOrFail($cash->payment_id);
@@ -50,7 +54,7 @@ class Ledger
             Validator::make(['handed_at' => $date], ['handed_at' => 'required|date_format:Y-m-d|before_or_equal:today|after_or_equal:'.$cash->collected_at->toDateString()])->validate();
             $payment = $this->postReceipt([
                 'idempotency_key' => (string) Str::uuid(), 'order_id' => $cash->order_id, 'paid_at' => $date,
-                'amount' => Money::format($cash->amount_minor), 'owner_id' => $cash->owner_id, 'rop_id' => $cash->rop_id,
+                'amount' => Money::format($cash->amount_minor),
             ], $cash);
             $cash->update(['status' => 'accepted', 'cashier_id' => $actor->id, 'handed_at' => $date, 'payment_id' => $payment->id]);
 
@@ -64,7 +68,6 @@ class Ledger
             'idempotency_key' => 'required|uuid', 'order_id' => 'required|exists:orders,id',
             'paid_at' => 'required|date|before_or_equal:today', 'amount' => 'required|string',
             'currency' => ['required', Rule::in(['UZS'])],
-            'owner_id' => 'nullable|exists:users,id', 'rop_id' => 'nullable|exists:users,id',
             'method' => 'nullable|string|max:255', 'notes' => 'nullable|string|max:5000', 'document' => 'nullable|string|max:255',
         ])->validate();
         $amount = Money::parse($data['amount']);
@@ -82,45 +85,67 @@ class Ledger
 
                 return $existing;
             }
+            if ($order->status === 'cancelled') {
+    $this->fail('Нельзя принимать оплату по отменённому заказу.');
+}
             if ($order->currency !== $data['currency']) {
                 $this->fail('Валюта оплаты должна совпадать с валютой заказа.');
             }
-            $owner = null;
-            $rop = null;
-            $managerId = $cash ? $cash->manager_id : $order->manager_id;
-            $hasSalesManager = $cash ? $cash->managed_sale : $order->manager?->role === 'manager';
-            if ($hasSalesManager) {
-                $owner = $cash ? User::find($cash->owner_id) : User::where('role', 'owner')->where('active', true)->find($data['owner_id'] ?? null);
-                $rop = $cash ? User::find($cash->rop_id) : User::where('role', 'rop')->where('active', true)->find($data['rop_id'] ?? null);
-                if (! $owner || ! $rop) {
-                    $this->fail('Для начисления выберите владельца, РОП и менеджера заказа.');
-                }
-            }
+            $terms = $cash?->order_financial_terms_id
+                ? $order->financialTerms()->whereKey($cash->order_financial_terms_id)->firstOrFail()
+                : $order->financialTerms;
+            $sellerId = $terms?->seller_id ?? $order->initial_seller_id ?? ($cash ? $cash->manager_id : $order->manager_id);
             $payment = Payment::create([
-                'idempotency_key' => $data['idempotency_key'], 'order_id' => $order->id, 'manager_id' => $managerId,
+                'idempotency_key' => $data['idempotency_key'], 'order_id' => $order->id, 'manager_id' => $sellerId,
+                'order_financial_terms_id' => $terms?->id,
                 'paid_at' => $data['paid_at'], 'amount_minor' => $amount, 'currency' => $data['currency'], 'recipient' => 'SFP',
                 'method' => $cash ? 'Наличные через кассира' : 'Перечисление', 'notes' => $data['notes'] ?? null, 'document' => $data['document'] ?? null,
-                'calculation_status' => $hasSalesManager ? 'calculated' : 'needs_clarification',
+                'calculation_status' => $terms ? 'calculated' : 'needs_clarification',
             ]);
-            if ($owner && $rop) {
-                $total = Money::percent($amount, 1000);
-                $ownerGross = min($total, Money::percent($amount, 500));
-                $ropGross = $total - $ownerGross;
-                $managerTotal = min($total, Money::percent($amount, 500));
-                $ownerManager = max($managerTotal - $ropGross, min($ownerGross, Money::percent($amount, 250)));
-                $ropManager = $managerTotal - $ownerManager;
-                foreach ([
-                    ['owner_gross', $owner->id, 'SFP', 500, $ownerGross],
-                    ['rop_gross', $rop->id, 'SFP', 500, $ropGross],
-                    ['manager_owner', $managerId, 'owner:'.$owner->id, 250, $ownerManager],
-                    ['manager_rop', $managerId, 'rop:'.$rop->id, 250, $ropManager],
-                ] as [$kind,$beneficiary,$payer,$rate,$sum]) {
-                    Accrual::create(['payment_id' => $payment->id, 'beneficiary_id' => $beneficiary, 'kind' => $kind, 'payer' => $payer, 'rate_bps' => $rate, 'amount_minor' => $sum, 'currency' => $payment->currency]);
-                }
+            if ($terms) {
+                $this->accrue($payment, $terms);
             }
 
             return $payment;
         }, 3);
+    }
+
+    private function accrue(Payment $payment, OrderFinancialTerms $terms): void
+    {
+        $amount = $payment->amount_minor;
+        $ownerRate = $terms->owner_funding_bps;
+        $ropRate = $terms->rop_funding_bps;
+        $gross = Money::percent($amount, $terms->owner_sfp_bps + $terms->rop_sfp_bps);
+        $commission = Money::percent($amount, $ownerRate + $ropRate);
+        $ownerGross = Money::percent($amount, $terms->owner_sfp_bps);
+        // The rounding unit must stay with the only funding party if its gross share needs it.
+        if ($ownerRate === 0) {
+            $ownerGross = min($ownerGross, $gross - $commission);
+        }
+        $ropGross = $gross - $ownerGross;
+        $ownerContribution = max($commission - $ropGross, min($ownerGross, Money::percent($amount, $ownerRate)));
+        $ropContribution = $commission - $ownerContribution;
+
+        $rows = [
+            ['owner_gross', $terms->owner_id, 'SFP', $terms->owner_sfp_bps, $ownerGross],
+            ['rop_gross', $terms->rop_id, 'SFP', $terms->rop_sfp_bps, $ropGross],
+        ];
+        if ($ownerRate > 0) {
+            $rows[] = ['manager_owner', $terms->seller_id, 'owner:'.$terms->owner_id, $ownerRate, $ownerContribution];
+        }
+        if ($ropRate > 0) {
+            $rows[] = ['manager_rop', $terms->seller_id, 'rop:'.$terms->rop_id, $ropRate, $ropContribution];
+        }
+        foreach ($rows as [$kind, $beneficiary, $payer, $rate, $sum]) {
+            $payment->accruals()->create([
+                'kind' => $kind,
+                'beneficiary_id' => $beneficiary,
+                'payer' => $payer,
+                'rate_bps' => $rate,
+                'amount_minor' => $sum,
+                'currency' => $payment->currency,
+            ]);
+        }
     }
 
     public function payout(array $input): Payout
@@ -128,7 +153,7 @@ class Ledger
         $this->owner();
         $data = Validator::make($input + ['currency' => 'UZS'], [
             'idempotency_key' => 'required|uuid', 'payer' => 'required|string|max:100',
-            'recipient_id' => 'required|exists:users,id', 'paid_at' => 'required|date|before_or_equal:today',
+            'recipient_id' => 'required|exists:users,id', 'paid_at' => 'required|date_format:Y-m-d|before_or_equal:today',
             'amount' => 'required|string', 'currency' => ['required', Rule::in(['UZS'])],
             'notes' => 'nullable|string|max:5000', 'allocations' => 'required|array|min:1',
             'allocations.*.accrual_id' => 'required|integer|distinct|exists:accruals,id',
@@ -139,8 +164,10 @@ class Ledger
             $this->fail('Сумма выплаты должна быть больше нуля.');
         }
 
-        return DB::transaction(function () use ($data, $amount) {
-            User::whereKey(auth()->id())->lockForUpdate()->firstOrFail();
+        $beneficiaries = Accrual::query()->whereKey(array_column($data['allocations'], 'accrual_id'))->pluck('beneficiary_id')->all();
+
+        return DB::transaction(function () use ($data, $amount, $beneficiaries) {
+            $this->lockCommissionAccounts($beneficiaries);
             if ($existing = Payout::where('idempotency_key', $data['idempotency_key'])->first()) {
                 $incoming = collect($data['allocations'])->mapWithKeys(fn ($a) => [(int) $a['accrual_id'] => Money::parse($a['amount'])])->sortKeys()->all();
                 $saved = $existing->allocations->pluck('amount_minor', 'accrual_id')->sortKeys()->all();
@@ -151,6 +178,7 @@ class Ledger
                 return $existing;
             }
             $rows = [];
+            $accountParts = [];
             $sum = 0;
             foreach (collect($data['allocations'])->sortBy('accrual_id') as $row) {
                 $accrual = Accrual::query()->lockForUpdate()->findOrFail($row['accrual_id']);
@@ -168,10 +196,21 @@ class Ledger
                     $this->fail('Оплата сторнирована.');
                 }
                 $sum += $part;
+                $accountParts[$accrual->beneficiary_id] = ($accountParts[$accrual->beneficiary_id] ?? 0) + $part;
                 $rows[] = ['accrual_id' => $accrual->id, 'amount_minor' => $part];
             }
             if ($sum !== $amount) {
                 $this->fail('Распределение должно точно совпадать с суммой выплаты.');
+            }
+            $balances = app(CommissionBalances::class);
+            $today = today()->toDateString();
+            foreach ($accountParts as $beneficiaryId => $part) {
+                $current = $balances->balance($beneficiaryId, $data['payer'], $data['currency'], $today);
+                $availableOnPaymentDate = $data['paid_at'] === $today ? $current
+                    : $balances->balance($beneficiaryId, $data['payer'], $data['currency'], $data['paid_at']);
+                if ($part > min($current, $availableOnPaymentDate)) {
+                    $this->fail('Сумма выплаты превышает остаток после зачёта встречной задолженности.');
+                }
             }
             $payout = Payout::create(collect($data)->except(['amount', 'allocations'])->all() + ['amount_minor' => $amount]);
             foreach ($rows as $row) {
@@ -189,12 +228,21 @@ class Ledger
             $this->fail('Укажите причину корректировки (не менее 5 символов).');
         }
 
-        return DB::transaction(function () use ($payment, $reason) {
+        $beneficiaries = $payment->accruals()->pluck('beneficiary_id')->all();
+
+        return DB::transaction(function () use ($payment, $reason, $beneficiaries) {
+            Order::query()->lockForUpdate()->findOrFail($payment->order_id);
             $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+            $this->lockCommissionAccounts($beneficiaries);
             if ($payment->reversal_of || Payment::where('reversal_of', $payment->id)->exists()) {
                 $this->fail('Операция уже сторнирована.');
             }
-            foreach ($payment->accruals as $accrual) {
+            if (RefundAllocation::where('payment_id', $payment->id)->whereHas('refund', fn ($refunds) => $refunds
+                ->whereIn('status', [Refund::APPROVED, Refund::COMPLETED]))->exists()) {
+                $this->fail('По оплате есть согласованный или выполненный возврат.');
+            }
+            $accruals = $payment->accruals()->orderBy('id')->lockForUpdate()->get();
+            foreach ($accruals as $accrual) {
                 if ((int) $accrual->allocations()->sum('amount_minor') !== 0) {
                     $this->fail('Есть выплаты по начислениям. Возврат требует отдельного согласования.');
                 }
@@ -203,7 +251,7 @@ class Ledger
                 'idempotency_key' => (string) Str::uuid(), 'amount_minor' => -$payment->amount_minor,
                 'notes' => $reason, 'reversal_of' => $payment->id, 'paid_at' => today()->toDateString(),
             ]);
-            foreach ($payment->accruals as $a) {
+            foreach ($accruals as $a) {
                 $reversal->accruals()->create(collect($a->getAttributes())->except(['id', 'created_at', 'updated_at', 'payment_id', 'amount_minor'])->all() + ['amount_minor' => -$a->amount_minor]);
             }
 
@@ -222,7 +270,10 @@ class Ledger
             $this->fail('Укажите причину корректировки (не менее 5 символов).');
         }
 
-        return DB::transaction(function () use ($payout, $reason) {
+        $beneficiaries = Accrual::query()->whereIn('id', $payout->allocations()->select('accrual_id'))->pluck('beneficiary_id')->all();
+
+        return DB::transaction(function () use ($payout, $reason, $beneficiaries) {
+            $this->lockCommissionAccounts($beneficiaries);
             $payout = Payout::query()->lockForUpdate()->findOrFail($payout->id);
             if ($payout->reversal_of || Payout::where('reversal_of', $payout->id)->exists()) {
                 $this->fail('Операция уже сторнирована.');
@@ -237,5 +288,13 @@ class Ledger
 
             return $reversal;
         }, 3);
+    }
+
+    private function lockCommissionAccounts(array $beneficiaries): void
+    {
+        $actorId = auth()->id();
+        $users = User::query()->whereKey([...$beneficiaries, $actorId])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $actor = $users->get($actorId);
+        abort_unless($actor?->active && $actor->role === 'owner', 403);
     }
 }

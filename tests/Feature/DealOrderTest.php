@@ -20,12 +20,12 @@ function dealWithProductionOrder(User $manager): array
     return [$deal, $order];
 }
 
-it('shows independent production status and opens the linked order in both deal views', function (string $view) {
+it('shows independent production status and opens the linked order in the table even through legacy view links', function (string $view) {
     $manager = User::factory()->create(['role' => 'manager', 'active' => true]);
     $this->actingAs($manager);
     [$deal, $order] = dealWithProductionOrder($manager);
     $before = $deal->refresh()->getRawOriginal();
-    $page = Livewire::test(ManageDeals::class)->set('viewMode', $view)
+    $page = Livewire::withQueryParams(['view' => $view])->test(ManageDeals::class)
         ->assertSee('Согласовано')->assertSee('Производство заказа')->assertSee('Производство')
         ->assertTableActionHidden('convert', $deal)->assertTableActionVisible('openOrder', $deal)
         ->mountTableAction('openOrder', $deal)
@@ -39,7 +39,7 @@ it('shows independent production status and opens the linked order in both deal 
     $this->assertDatabaseCount('payments', 0);
     $this->assertDatabaseCount('accruals', 0);
     $order->update(['status' => 'ready']);
-    Livewire::test(ManageDeals::class)->set('viewMode', $view)->assertSee('Готов')->assertSee('Согласовано');
+    Livewire::withQueryParams(['view' => $view])->test(ManageDeals::class)->assertSee('Готов')->assertSee('Согласовано');
 })->with(['table', 'kanban']);
 
 it('keeps conversion available only for an agreed deal without an order', function () {
@@ -47,7 +47,7 @@ it('keeps conversion available only for an agreed deal without an order', functi
     $this->actingAs($owner);
     $client = Client::create(['name' => 'Клиент']);
     $deal = Deal::create(['title' => 'Без заказа', 'client_id' => $client->id, 'status' => 'won', 'currency' => 'UZS', 'items' => []]);
-    Livewire::test(ManageDeals::class)->set('viewMode', 'kanban')->assertSee('Заказ не создан')
+    Livewire::test(ManageDeals::class)->assertSee('Заказ не создан')
         ->assertTableActionVisible('convert', $deal)->assertTableActionHidden('openOrder', $deal)
         ->callTableAction('convert', $deal)->assertHasNoTableActionErrors()
         ->assertTableActionHidden('convert', $deal)->assertTableActionVisible('openOrder', $deal);
@@ -60,12 +60,12 @@ it('does not expose a linked order reassigned to another manager', function (str
     [$deal, $order] = dealWithProductionOrder($manager);
     $order->update(['manager_id' => $other->id]);
     $this->actingAs($manager);
-    Livewire::test(ManageDeals::class)->set('viewMode', $view)->assertSee('Нет доступа к заказу')->assertDontSee($order->number)
+    Livewire::withQueryParams(['view' => $view])->test(ManageDeals::class)->assertSee('Нет доступа к заказу')->assertDontSee($order->number)
         ->assertTableActionHidden('openOrder', $deal)->assertTableActionHidden('convert', $deal)
         ->call('mountAction', 'openOrder', [], ['table' => true, 'recordKey' => (string) $deal->id])
         ->assertActionNotMounted('openOrder');
     $this->actingAs($other);
-    Livewire::test(ManageDeals::class)->set('viewMode', $view)->assertDontSee('Тестовые визитки')
+    Livewire::withQueryParams(['view' => $view])->test(ManageDeals::class)->assertDontSee('Тестовые визитки')
         ->call('mountAction', 'openOrder', [], ['table' => true, 'recordKey' => (string) $deal->id])
         ->assertActionNotMounted('openOrder');
     $this->assertDatabaseCount('orders', 1);

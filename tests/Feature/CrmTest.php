@@ -31,9 +31,16 @@ function crmScenario(string $currency = 'UZS'): array
     $rop = User::factory()->create(['role' => 'rop', 'active' => true]);
     $manager = User::factory()->create(['role' => 'manager', 'active' => true]);
     $client = Client::create(['name' => 'Тестовый клиент', 'manager_id' => $manager->id]);
-    $order = Order::create(['number' => (string) Str::ulid(), 'client_id' => $client->id, 'manager_id' => $manager->id, 'currency' => $currency, 'status' => 'new']);
-    $order->items()->create(['name' => 'Тестовая позиция', 'price_minor' => 1000000000, 'quantity' => 1]);
     test()->actingAs($owner);
+    $attributes = ['number' => (string) Str::ulid(), 'client_id' => $client->id, 'manager_id' => $manager->id, 'currency' => $currency, 'status' => 'new'];
+    if ($currency === 'UZS') {
+        $order = app(CrmWriter::class)->save(Order::class, $attributes + [
+            'items' => [['name' => 'Тестовая позиция', 'price' => '10000000', 'quantity' => 1]],
+        ]);
+    } else {
+        $order = Order::create($attributes);
+        $order->items()->create(['name' => 'Тестовая позиция', 'price_minor' => 1000000000, 'quantity' => 1]);
+    }
     $input = ['idempotency_key' => (string) Str::uuid(), 'order_id' => $order->id, 'paid_at' => today()->toDateString(), 'amount' => '10000000', 'currency' => $currency, 'owner_id' => $owner->id, 'rop_id' => $rop->id];
 
     return [$owner, $rop, $manager, $order, $input];
@@ -98,8 +105,11 @@ it('retains every minor unit at the rounding boundary and flags unassigned order
     $ledger->payment(array_replace($input, ['amount' => '0.15']));
     $totals = app(Report::class)->build($owner, null, null)['currencies']['UZS'];
     expect($totals['owner_net'] + $totals['rop_net'] + $totals['manager_accrued'])->toBe(2);
-    $order->update(['manager_id' => null]);
-    $pending = $ledger->payment(array_replace($input, ['idempotency_key' => (string) Str::uuid()]));
+    $unassigned = app(CrmWriter::class)->save(Order::class, [
+        'number' => 'UNASSIGNED', 'client_id' => $order->client_id, 'status' => 'new',
+        'items' => [['name' => 'Без продавца', 'price' => '100', 'quantity' => 1]],
+    ]);
+    $pending = $ledger->payment(array_replace($input, ['order_id' => $unassigned->id, 'idempotency_key' => (string) Str::uuid()]));
     expect($pending->calculation_status)->toBe('needs_clarification')->and($pending->accruals)->toBeEmpty();
 });
 
@@ -156,7 +166,9 @@ it('lets the owner personally handle a client and deal through conversion and re
     $order = $writer->convert($deal);
     expect($order->manager_id)->toBe($owner->id);
     $payment = app(Ledger::class)->payment(array_replace($input, ['order_id' => $order->id, 'amount' => '100', 'rop_id' => null]));
-    expect($payment->calculation_status)->toBe('needs_clarification')->and($payment->accruals)->toBeEmpty()->and($order->fresh()->paid_minor)->toBe(10000);
+    expect($payment->calculation_status)->toBe('calculated')
+        ->and($payment->accruals->pluck('kind')->all())->toBe(['owner_gross', 'rop_gross'])
+        ->and($order->fresh()->paid_minor)->toBe(10000);
 });
 
 it('charts prior debt, separately dated payments and role-specific settlements in one currency', function () {
@@ -247,7 +259,8 @@ it('lets a designer take their own orders, transfers and cash without access to 
     $ledger = app(Ledger::class);
     expect(fn () => $ledger->payment($input))->toThrow(ModelNotFoundException::class);
     $payment = $ledger->payment(array_replace($input, ['order_id' => $order->id, 'amount' => '50']));
-    expect($payment->recipient)->toBe('SFP')->and($payment->accruals)->toBeEmpty();
+    expect($payment->recipient)->toBe('SFP')
+        ->and($payment->accruals->pluck('kind')->all())->toBe(['owner_gross', 'rop_gross']);
     $cashData = ['idempotency_key' => (string) Str::uuid(), 'amount' => '50', 'collected_at' => today()->toDateString(), 'order_id' => $order->id];
     $desk = app(CashDesk::class);
     expect(fn () => $desk->collect(array_replace($cashData, ['order_id' => $foreignOrder->id])))->toThrow(ModelNotFoundException::class);

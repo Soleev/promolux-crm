@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['idempotency_key', 'order_id', 'manager_id', 'managed_sale', 'collector_id', 'owner_id', 'rop_id', 'cashier_id', 'payment_id', 'collected_at', 'handed_at', 'amount_minor', 'status', 'reason'])]
+#[Fillable(['idempotency_key', 'order_id', 'order_financial_terms_id', 'manager_id', 'managed_sale', 'collector_id', 'owner_id', 'rop_id', 'cashier_id', 'payment_id', 'collected_at', 'handed_at', 'amount_minor', 'status', 'reason'])]
 class CashReceipt extends Model
 {
     use Concerns\Audited;
@@ -19,6 +19,11 @@ class CashReceipt extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function financialTerms(): BelongsTo
+    {
+        return $this->belongsTo(OrderFinancialTerms::class, 'order_financial_terms_id');
     }
 
     public function collector(): BelongsTo

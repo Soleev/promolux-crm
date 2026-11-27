@@ -55,6 +55,7 @@ class AdminPanelProvider extends PanelProvider
                 Action::make('about')->label('О программе')->icon('heroicon-o-information-circle')->url(fn () => About::getUrl()),
             ])
             ->profile()
+            ->databaseNotifications()
             ->databaseTransactions()
             ->login()
             ->colors([

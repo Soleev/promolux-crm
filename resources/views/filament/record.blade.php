@@ -1,6 +1,6 @@
 <div class="space-y-5">
     @php
-    $labels=['creator_name'=>'Постановщик','assignee_name'=>'Исполнитель','id'=>'Номер записи','name'=>'Имя / название','title'=>'Название','number'=>'Номер заказа','manager_id'=>'Ответственный (№)','client_id'=>'Клиент (№)','deal_id'=>'Сделка (№)','order_id'=>'Заказ (№)','phone'=>'Телефон','email'=>'Email','source'=>'Источник','notes'=>'Примечания','description'=>'Описание','contacts'=>'Контактные лица','status'=>'Статус','currency'=>'Валюта','due_at'=>'Срок','paid_at'=>'Дата оплаты','amount_minor'=>'Сумма','recipient'=>'Получатель','recipient_id'=>'Получатель (№)','beneficiary_id'=>'Получатель начисления (№)','payer'=>'Плательщик','kind'=>'Вид начисления','rate_bps'=>'Ставка в базисных пунктах','payment_id'=>'Оплата (№)','method'=>'Способ оплаты','calculation_status'=>'Расчёт','reversal_of'=>'Сторно операции №','category'=>'Категория','role'=>'Роль','active'=>'Доступ','lost_reason'=>'Причина проигрыша','created_at'=>'Создано','updated_at'=>'Изменено','total'=>'Стоимость заказа','payment_status'=>'Статус оплаты','subject_type'=>'Тип записи','subject_id'=>'Номер записи','event'=>'Действие','changes'=>'Изменения','actor_id'=>'Автор (№)','items'=>'Позиции','email_verified_at'=>'Email подтверждён'];
+    $labels=['creator_name'=>'Постановщик','assignee_name'=>'Исполнитель','id'=>'Номер записи','name'=>'Имя / название','title'=>'Название','number'=>'Номер заказа','manager_id'=>'Ответственный (№)','client_id'=>'Клиент (№)','deal_id'=>'Сделка (№)','order_id'=>'Заказ (№)','phone'=>'Телефон','email'=>'Email','source'=>'Источник','notes'=>'Примечания','description'=>'Описание','contacts'=>'Контактные лица','status'=>'Статус','currency'=>'Валюта','due_at'=>'Срок','paid_at'=>'Дата оплаты','amount_minor'=>'Сумма','recipient'=>'Получатель','recipient_id'=>'Получатель (№)','beneficiary_id'=>'Получатель начисления (№)','payer'=>'Плательщик','kind'=>'Вид начисления','rate_bps'=>'Сохранённая ставка','payment_id'=>'Оплата (№)','method'=>'Способ оплаты','calculation_status'=>'Расчёт','reversal_of'=>'Сторно операции №','category'=>'Категория','role'=>'Роль','active'=>'Доступ','lost_reason'=>'Причина проигрыша','created_at'=>'Создано','updated_at'=>'Изменено','total'=>'Стоимость заказа','payment_status'=>'Статус оплаты','subject_type'=>'Тип записи','subject_id'=>'Номер записи','event'=>'Действие','changes'=>'Изменения','actor_id'=>'Автор (№)','items'=>'Позиции','email_verified_at'=>'Email подтверждён'];
     @endphp
     @if(isset($details['balanceOrder']))
         <section class="space-y-3">
@@ -9,10 +9,26 @@
             <a class="text-sm underline" href="#order-payments-{{ $record->id }}">История оплат заказа</a>
         </section>
     @endif
+    @if(isset($details['balanceOrder']) && $details['balanceOrder']->status === 'cancelled')
+        @php($balanceOrder = $details['balanceOrder'])
+        <section class="space-y-3">
+            <h3 class="font-semibold">Отмена заказа</h3>
+            <dl class="grid gap-3 sm:grid-cols-2">
+                @if(\App\Services\RefundAccess::canViewAny(auth()->user()))
+                    <div><dt class="text-xs text-gray-500">Удержано по заказу</dt><dd>{{ $balanceOrder->displayAmount($balanceOrder->confirmed_paid_minor - $balanceOrder->returned_minor) }}</dd></div>
+                    <div><dt class="text-xs text-gray-500">Ожидает возврата</dt><dd>{{ $balanceOrder->displayAmount((int) $balanceOrder->approved_refund_minor) }}</dd></div>
+                @endif
+                @if(isset($details['cancellation']))
+                    <div><dt class="text-xs text-gray-500">Дата отмены</dt><dd>{{ $details['cancellation']->cancelled_at->timezone('Asia/Tashkent')->format('d.m.Y H:i') }}</dd></div>
+                    <div><dt class="text-xs text-gray-500">Причина отмены</dt><dd class="whitespace-pre-line break-words">{{ $details['cancellation']->reason }}</dd></div>
+                @endif
+            </dl>
+        </section>
+    @endif
     <dl class="grid gap-3 sm:grid-cols-2">
     @foreach($details['fields'] as $key=>$value)
         @if($value !== null && $value !== '' && $key!=='items')
-        <div><dt class="text-xs text-gray-500">{{ $labels[$key] ?? $key }}</dt><dd class="whitespace-pre-line break-words text-sm">{{ is_array($value) ? 'Подробности недоступны' : $value }}</dd></div>
+        <div><dt class="text-xs text-gray-500">{{ $labels[$key] ?? $key }}</dt><dd class="whitespace-pre-line break-words text-sm">@if(in_array($key, ['status', 'calculation_status'], true))<x-filament::badge :color="\App\Filament\CrmTableUi::color($record->getAttribute($key))">{{ $value }}</x-filament::badge>@else{{ is_array($value) ? 'Подробности недоступны' : $value }}@endif</dd></div>
         @endif
     @endforeach
     </dl>
@@ -55,7 +71,7 @@
         @foreach($details['related'] as $line)<p class="text-sm">{{ $line }}</p>@endforeach
     @endif
     @foreach($details['accruals'] as $a)
-        <p class="text-sm">#{{ $a->id }} · {{ $a->beneficiary->name }} · {{ \App\Filament\CrmForms::kindLabels()[$a->kind] }} · {{ \App\Services\Money::display($a->amount_minor) }}</p>
+        <p class="text-sm">#{{ $a->id }} · {{ $a->beneficiary->name }} · {{ \App\Filament\CrmForms::accrualLabel($a) }} · {{ \App\Services\Money::display($a->amount_minor) }}</p>
     @endforeach
     @foreach($details['allocations'] as $a)
         <p class="text-sm">Начисление #{{ $a->accrual_id }} · {{ $a->accrual->beneficiary->name }} · {{ \App\Services\Money::display($a->amount_minor) }}</p>

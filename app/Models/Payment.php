@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['idempotency_key', 'order_id', 'manager_id', 'paid_at', 'amount_minor', 'currency', 'recipient', 'method', 'notes', 'document', 'calculation_status', 'reversal_of'])]
+#[Fillable(['idempotency_key', 'order_id', 'order_financial_terms_id', 'manager_id', 'paid_at', 'amount_minor', 'currency', 'recipient', 'method', 'notes', 'document', 'calculation_status', 'reversal_of'])]
 class Payment extends Model
 {
     use Concerns\Audited;
@@ -21,6 +21,11 @@ class Payment extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function financialTerms(): BelongsTo
+    {
+        return $this->belongsTo(OrderFinancialTerms::class, 'order_financial_terms_id');
     }
 
     public function manager(): BelongsTo

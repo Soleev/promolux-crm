@@ -45,13 +45,13 @@ class ClientDebts extends Page implements HasTable
     private function debts(): Builder
     {
         abort_unless(static::canAccess(), 403);
-        $totals = CrmAccess::query(Order::class)->withPaymentTotals()->addSelect([
+        $totals = CrmAccess::query(Order::class)->where('orders.status', '!=', 'cancelled')->withPaymentTotals()->addSelect([
             'client_name' => ClientDirectory::visible()->select('name')->whereColumn('clients.id', 'orders.client_id'),
             'product' => OrderItem::select('name')->whereColumn('order_id', 'orders.id')->orderBy('id')->limit(1),
         ]);
         // Cast before subtraction: MariaDB may return unsigned amounts and an overpayment is valid.
         $balances = Order::query()->fromSub($totals, 'orders')->select('orders.*')
-            ->selectRaw('CAST(COALESCE(ordered_minor, 0) AS DECIMAL(32,0)) - COALESCE(confirmed_minor, 0) - COALESCE(pending_minor, 0) AS debt_minor');
+            ->selectRaw('CAST(COALESCE(ordered_minor, 0) AS DECIMAL(32,0)) - COALESCE(confirmed_minor, 0) - COALESCE(pending_minor, 0) + COALESCE(returned_minor, 0) AS debt_minor');
 
         return Order::query()->fromSub($balances, 'orders')->where('debt_minor', '>', 0);
     }
@@ -80,7 +80,7 @@ class ClientDebts extends Page implements HasTable
             ])->from('md'),
         ])->filters([
             SelectFilter::make('manager_id')->label('Ответственный')->options(fn () => User::whereIn('id', CrmAccess::query(Order::class)->select('manager_id'))->orderBy('name')->pluck('name', 'id')),
-            SelectFilter::make('status')->label('Статус заказа')->options(CrmForms::orderStatuses()),
+            SelectFilter::make('status')->label('Статус заказа')->options(array_diff_key(CrmForms::orderStatuses(), ['cancelled' => true])),
             SelectFilter::make('amount')->label('Долг в валюте заказа')->options([
                 'small' => 'До 1 млн', 'medium' => 'От 1 до 10 млн', 'large' => 'От 10 млн',
             ])->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {

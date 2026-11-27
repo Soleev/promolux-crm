@@ -38,7 +38,7 @@ it('opens an order from the owner table and shows its details with the stored it
     }
     $order = app(CrmWriter::class)->save(Order::class, [
         'number' => 'TEST-CARD-'.strtoupper($status), 'client_id' => $client->id,
-        'manager_id' => $owner->id, 'status' => $status, 'items' => $items,
+        'manager_id' => $owner->id, 'status' => $status === 'cancelled' ? 'new' : $status, 'items' => $items,
     ]);
 
     if ($layout !== 'manual') {
@@ -47,7 +47,27 @@ it('opens an order from the owner table and shows its details with the stored it
             'catalog_snapshot' => ['supplier_id' => $sfp->id, 'copies' => 4, 'rate_minor' => 90000],
         ]);
     }
+    if ($status === 'cancelled') {
+        app(\App\Services\OrderCancellationService::class)->cancel(
+            $order,
+            'Тестовая отмена заказа',
+            (string) \Illuminate\Support\Str::uuid()
+        );
 
+        $order->refresh();
+
+        Livewire::test(ManageOrders::class)
+            ->assertCanSeeTableRecords([$order])
+            ->assertTableActionHidden('edit', $order)
+            ->call('mountAction', 'details', [], [
+                'table' => true,
+                'recordKey' => (string) $order->id,
+            ])
+            ->assertOk()
+            ->assertMountedActionModalSee($order->items()->pluck('name')->all());
+
+        return;
+    }
     $table = Livewire::test(ManageOrders::class)->assertCanSeeTableRecords([$order]);
     $rowAction = $table->instance()->getTable()->getRecordAction($order);
     expect($rowAction)->toBe('edit');

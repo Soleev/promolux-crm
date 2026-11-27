@@ -3,6 +3,22 @@
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
 
+/* Deal stages use native Filament tabs and semantic palette variables. */
+.plx-deal-tab-primary { --stage-light: var(--primary-50); --stage-border: var(--primary-200); --stage-text: var(--primary-700); --stage-solid: var(--primary-700); --stage-dark: var(--primary-950); --stage-dark-text: var(--primary-200); }
+.plx-deal-tab-gray { --stage-light: var(--gray-50); --stage-border: var(--gray-200); --stage-text: var(--gray-700); --stage-solid: var(--gray-700); --stage-dark: var(--gray-950); --stage-dark-text: var(--gray-200); }
+.plx-deal-tab-info { --stage-light: var(--info-50); --stage-border: var(--info-200); --stage-text: var(--info-700); --stage-solid: var(--info-700); --stage-dark: var(--info-950); --stage-dark-text: var(--info-200); }
+.plx-deal-tab-warning { --stage-light: var(--warning-50); --stage-border: var(--warning-200); --stage-text: var(--warning-700); --stage-solid: var(--warning-700); --stage-dark: var(--warning-950); --stage-dark-text: var(--warning-200); }
+.plx-deal-tab-success { --stage-light: var(--success-50); --stage-border: var(--success-200); --stage-text: var(--success-700); --stage-solid: var(--success-700); --stage-dark: var(--success-950); --stage-dark-text: var(--success-200); }
+.plx-deal-tab-danger { --stage-light: var(--danger-50); --stage-border: var(--danger-200); --stage-text: var(--danger-700); --stage-solid: var(--danger-700); --stage-dark: var(--danger-950); --stage-dark-text: var(--danger-200); }
+.fi-tabs-item.plx-deal-tab { background: var(--stage-light); color: var(--stage-text); border: 1px solid var(--stage-border); }
+.fi-tabs-item.plx-deal-tab .fi-tabs-item-label { color: inherit; }
+.fi-tabs-item.plx-deal-tab .fi-badge { background: transparent; color: inherit; box-shadow: none; }
+.dark .fi-tabs-item.plx-deal-tab { background: var(--stage-dark); color: var(--stage-dark-text); border-color: var(--stage-solid); }
+.fi-tabs-item.plx-deal-tab.fi-active { background: var(--stage-solid); border-color: var(--stage-solid); color: white; }
+.fi-tabs-item.plx-deal-tab:focus-visible { outline: 2px solid var(--stage-solid); outline-offset: 2px; }
+.fi-resource-deals .fi-tabs { flex-wrap: wrap; gap: .5rem; }
+
+
 .day-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 1rem; align-items: start; }
 .day-sections > * { min-width: 0; overflow-wrap: anywhere; }
 .day-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem 1.25rem; }
@@ -14,7 +30,7 @@
 .help-article ol { list-style: decimal; padding-inline-start: 1.25rem; margin-bottom: .75rem; }
 .help-article li + li { margin-top: .5rem; }
 
-.day-late { border-inline-start: 3px solid var(--warning-500); padding-inline-start: .5rem; }
+.day-late { border-inline-start: 3px solid var(--danger-500); padding-inline-start: .5rem; }
 
 /* Promolux CRM — Filament Default refinements. No third-party theme. */
 .plx-day-toolbar { display: grid; gap: .75rem; margin-bottom: .25rem; }
@@ -70,11 +86,13 @@
 .fi-body { background: var(--plx-canvas); }
 .fi-sidebar { background: var(--plx-surface); border-inline-end: 1px solid var(--plx-border); }
 .fi-topbar { border-bottom: 1px solid var(--plx-border); }
-.fi-sidebar-item-active .fi-sidebar-item-btn { background: var(--plx-muted); border-radius: .85rem; }
-.fi-section, .fi-ta, .fi-modal-window, .fi-wi-stats-overview-stat { border-radius: 1rem; box-shadow: 0 2px 8px #19103508; }
-.fi-btn, .fi-input-wrp, .fi-tabs { border-radius: .7rem; }
-.fi-ta-header-cell { background: var(--plx-canvas); }
-.fi-wi-stats-overview-stat-value { font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn { background: var(--plx-muted); }
+.fi-wi-stats-overview-stat-value { font-variant-numeric: tabular-nums; }
+/* Keep native component geometry; compact only page and navigation spacing. */
+.fi-page-header-main-ctn { padding-block: 1.5rem; row-gap: 1.5rem; }
+.fi-page-content { row-gap: 1.5rem; }
+.fi-sidebar-nav { padding-block: 1rem; row-gap: 1rem; }
+.fi-sidebar-nav-groups { row-gap: 1rem; }
 .plx-stat-violet { background: #eee9ff; } .plx-stat-blue { background: #e7f2ff; }
 .plx-stat-green { background: #e4f7eb; } .plx-stat-amber { background: #fff0db; }
 .dark .plx-stat-violet { background: #30254e; } .dark .plx-stat-blue { background: #192e46; }
@@ -107,9 +125,6 @@
  .plx-cash-confirm { grid-template-columns: 1fr; }
 }
 
-.fi-btn.fi-color-primary { background-color: #5b35e5; color: #fff; }
-.fi-btn.fi-color-primary:hover { background-color: #4824cc; color: #fff; }
-.fi-btn.fi-color-primary:focus-visible { outline: 2px solid #9c87ff; outline-offset: 3px; }
 .fi-resource-cash-receipts .fi-ta-actions .fi-btn { min-height: 2.75rem; }
 /* Open release history, scoped to the About page. */
 .plx-release-timeline { list-style: none; margin: 0; padding: 0 0 0 1rem; max-width: 76ch; }
@@ -127,4 +142,14 @@
  .plx-release-timeline { padding-inline-start: .4rem; }
  .plx-release { padding-inline-start: 1.1rem; padding-bottom: 1.75rem; }
  .plx-release-version { font-size: 1.25rem; }
+}
+/* Promolux primary buttons */
+.fi-btn.fi-color-primary {
+    background-color: #5B35E5;
+    color: #fff;
+}
+
+.fi-btn.fi-color-primary:hover {
+    background-color: #4824CC;
+    color: #fff;
 }

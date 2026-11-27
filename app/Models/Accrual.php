@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -33,8 +34,23 @@ class Accrual extends Model
         return $this->hasMany(Allocation::class);
     }
 
+    public function refundCommissionReversals(): HasMany
+    {
+        return $this->hasMany(RefundCommissionReversal::class);
+    }
+
+    public function scopeWithOutstandingAmounts(Builder $query): Builder
+    {
+        return $query->withSum('allocations as allocated_minor', 'amount_minor')
+            ->withSum('refundCommissionReversals as refund_reversed_minor', 'amount_minor');
+    }
+
     public function getOutstandingMinorAttribute(): int
     {
-        return $this->amount_minor - (int) $this->allocations()->sum('amount_minor');
+        $paid = array_key_exists('allocated_minor', $this->attributes) ? $this->attributes['allocated_minor'] : $this->allocations()->sum('amount_minor');
+        $reversed = array_key_exists('refund_reversed_minor', $this->attributes)
+            ? $this->attributes['refund_reversed_minor'] : $this->refundCommissionReversals()->sum('amount_minor');
+
+        return $this->amount_minor - (int) $paid - (int) $reversed;
     }
 }
